@@ -44,6 +44,10 @@
   .msg.ok { color:#86efac; }
   .hidden { display:none !important; }
   .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .cfg { margin-top:12px; border:1px solid #2b3a58; border-radius:10px; overflow:hidden; }
+  .cfg-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; background:#0b1324; border-bottom:1px solid #1f2b45; font-size:.8rem; color:var(--muted); }
+  .cfg-head button { padding:5px 10px; font-size:.8rem; }
+  .cfg pre { margin:0; padding:10px 12px; max-height:220px; overflow:auto; background:#0b1324; white-space:pre-wrap; overflow-wrap:anywhere; }
   @media (max-width:560px) { .split { grid-template-columns: 1fr; } .kv { grid-template-columns: 100px 1fr; } }
 </style>
 </head>
@@ -89,10 +93,19 @@
 
   <div id="connectedCard" class="card hidden">
     <h2>MCP 接入信息</h2>
-    <label>MCP Endpoint</label>
+    <div class="small muted" style="margin-bottom:10px">
+      以下信息可直接复制到对应客户端；Token 与设备一一对应，请勿外传。
+    </div>
+
+    <label>MCP Endpoint（IP）</label>
     <div class="urlbox">
       <input id="mcpUrl" readonly class="mono">
       <button id="copyUrl">复制</button>
+    </div>
+    <label>mDNS 地址（IP 变化时仍可用）</label>
+    <div class="urlbox">
+      <input id="mcpMdns" readonly class="mono">
+      <button id="copyMdns">复制</button>
     </div>
     <label>Bearer Token</label>
     <div class="urlbox">
@@ -100,8 +113,27 @@
       <button id="showToken">显示</button>
       <button id="copyToken">复制</button>
     </div>
-    <div class="small muted" style="margin-top:10px">
-      Hermes：填写 url + Authorization header；OpenClaw：transport 必须为 streamable-http。
+    <div id="tokenHint" class="msg small"></div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="copyAll" class="primary">复制全部接入信息</button>
+    </div>
+
+    <div class="cfg">
+      <div class="cfg-head"><span>Hermes · ~/.hermes/config.yaml</span><button id="copyHermes">复制</button></div>
+      <pre id="cfgHermes" class="mono"></pre>
+    </div>
+    <div class="cfg">
+      <div class="cfg-head"><span>OpenClaw · CLI</span><button id="copyOpenclaw">复制</button></div>
+      <pre id="cfgOpenclaw" class="mono"></pre>
+    </div>
+    <div class="cfg">
+      <div class="cfg-head"><span>通用 MCP 客户端 · JSON</span><button id="copyGeneric">复制</button></div>
+      <pre id="cfgGeneric" class="mono"></pre>
+    </div>
+    <div class="cfg">
+      <div class="cfg-head"><span>连通性自检 · curl initialize</span><button id="copyCurl">复制</button></div>
+      <pre id="cfgCurl" class="mono"></pre>
     </div>
   </div>
 
@@ -157,6 +189,7 @@
   let token = localStorage.getItem('mcp_token') || '';
   let pollTimer = null;
   let lastState = '';
+  let lastStatus = null;
 
   const authHeaders = () => token ? { 'Authorization': 'Bearer ' + token } : {};
 
@@ -188,6 +221,92 @@
     return ({ provisioning: '配网中', connecting: '连接中', connected: '已连接', error: '连接失败', boot: '启动中' })[s] || s;
   }
 
+  function buildConfigs(s) {
+    const url = (s && s.mcp_url) || ((s && s.ip) ? 'http://' + s.ip + ':8080/mcp' : '');
+    const mdns = (s && s.mdns) ? 'http://' + s.mdns + ':8080/mcp' : '';
+    const tok = token || '<TOKEN>';
+    const hermes = [
+      'mcp_servers:',
+      '  esp32_mcp:',
+      '    url: "' + url + '"',
+      '    headers:',
+      '      Authorization: "Bearer ' + tok + '"',
+      '    tools:',
+      '      include:',
+      '        - device_info',
+      '        - sys_status',
+      '        - wifi_status',
+      '        - gpio_list',
+      '        - gpio_read',
+      '        - ota_status',
+      '      resources: true',
+      '      prompts: false'
+    ].join('\n');
+    const openclaw = 'openclaw mcp set esp32_mcp \'{\n' +
+      '  "url": "' + url + '",\n' +
+      '  "transport": "streamable-http",\n' +
+      '  "headers": {"Authorization": "Bearer ' + tok + '"},\n' +
+      '  "connectionTimeoutMs": 5000,\n' +
+      '  "requestTimeoutMs": 15000\n' +
+      '}\'';
+    const generic = [
+      '{',
+      '  "mcpServers": {',
+      '    "esp32_mcp": {',
+      '      "type": "http",',
+      '      "url": "' + url + '",',
+      '      "headers": { "Authorization": "Bearer ' + tok + '" }',
+      '    }',
+      '  }',
+      '}'
+    ].join('\n');
+    const curl = 'curl -s ' + url + ' \\\n' +
+      '  -H "Authorization: Bearer ' + tok + '" \\\n' +
+      '  -H "Content-Type: application/json" \\\n' +
+      '  -H "Accept: application/json, text/event-stream" \\\n' +
+      '  -d \'{"jsonrpc":"2.0","id":1,"method":"initialize","params":' +
+      '{"protocolVersion":"2024-11-05","capabilities":{},' +
+      '"clientInfo":{"name":"curl","version":"0"}}}\'';
+    return { url, mdns, tok, hermes, openclaw, generic, curl };
+  }
+
+  function renderConfig(s) {
+    const c = buildConfigs(s);
+    $('mcpUrl').value = c.url;
+    $('mcpMdns').value = c.mdns;
+    $('mcpToken').value = token;
+    $('cfgHermes').textContent = c.hermes;
+    $('cfgOpenclaw').textContent = c.openclaw;
+    $('cfgGeneric').textContent = c.generic;
+    $('cfgCurl').textContent = c.curl;
+    setMsg($('tokenHint'),
+      token ? '' : '尚未获取 Token：请在下方“高级 → MCP Token”粘贴后保存，或在 AP 模式（192.168.4.1）刷新本页。',
+      token ? '' : 'err');
+  }
+
+  function allConfigText(s) {
+    const c = buildConfigs(s);
+    return [
+      'ESP32-S3 MCP Node',
+      'Endpoint : ' + c.url,
+      'mDNS     : ' + c.mdns,
+      'Token    : ' + (token || '<TOKEN>'),
+      'Hostname : ' + ((s && s.hostname) || '-'),
+      '',
+      '--- Hermes (~/.hermes/config.yaml) ---',
+      c.hermes,
+      '',
+      '--- OpenClaw ---',
+      c.openclaw,
+      '',
+      '--- Generic JSON ---',
+      c.generic,
+      '',
+      '--- curl ---',
+      c.curl
+    ].join('\n');
+  }
+
   async function refresh() {
     try {
       const s = await api('/api/status');
@@ -205,11 +324,12 @@
         $('mcpToken').value = s.mcp_token;
       }
 
+      lastStatus = s;
+
       if (s.state === 'connected') {
         $('setupCard').classList.add('hidden');
         $('connectedCard').classList.remove('hidden');
-        $('mcpUrl').value = s.mcp_url || '';
-        $('mcpToken').value = token;
+        renderConfig(s);
       } else {
         $('setupCard').classList.remove('hidden');
         $('connectedCard').classList.add('hidden');
@@ -382,6 +502,12 @@
   $('showToken').onclick = () => { const el = $('mcpToken'); el.type = el.type === 'password' ? 'text' : 'password'; };
   $('copyUrl').onclick = () => copyText($('mcpUrl').value, $('copyUrl'));
   $('copyToken').onclick = () => copyText($('mcpToken').value, $('copyToken'));
+  $('copyMdns').onclick = () => copyText($('mcpMdns').value, $('copyMdns'));
+  $('copyHermes').onclick = () => copyText($('cfgHermes').textContent, $('copyHermes'));
+  $('copyOpenclaw').onclick = () => copyText($('cfgOpenclaw').textContent, $('copyOpenclaw'));
+  $('copyGeneric').onclick = () => copyText($('cfgGeneric').textContent, $('copyGeneric'));
+  $('copyCurl').onclick = () => copyText($('cfgCurl').textContent, $('copyCurl'));
+  $('copyAll').onclick = () => copyText(allConfigText(lastStatus), $('copyAll'));
 
   $('tokenInput').value = token;
   refresh();

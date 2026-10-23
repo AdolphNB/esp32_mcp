@@ -16,7 +16,7 @@
 - ✅ 11 个 MCP 工具 + 2 个资源
 - ✅ WS2812（GPIO48）
 - ✅ `idf.py build` 通过，固件约 1.3 MB
-- ⏳ 实机烧录/配网/OTA 联调待执行（当前环境无串口权限）
+- ✅ 实机烧录 / 配网 / MCP 握手验证通过
 
 详细设计见 [`docs/DESIGN.md`](docs/DESIGN.md)。
 
@@ -74,13 +74,37 @@ sudo chmod 666 /dev/ttyUSB0
 3. 扫描并选择 Wi-Fi，输入密码，点击“连接”。
 4. 成功后页面显示：
    - MCP Endpoint：`http://<ip>:8080/mcp`
+   - mDNS 地址：`http://<hostname>.local:8080/mcp`
    - Bearer Token（每台设备独立，存 NVS）
+   - 可直接复制的 Hermes / OpenClaw / 通用 JSON / curl 配置块
+
+“MCP 接入信息”卡片会一次性列出全部接入参数，每块都有复制按钮，点“复制全部接入信息”可把 Endpoint、mDNS、Token 和各客户端配置一起拷走。
 
 AP 会在 STA 连接成功 2 分钟后自动关闭。Wi-Fi 凭证和 Token 掉电保存。配网成功页会显示 Token，请及时复制；之后也可从串口日志或重新配网获取。
 
 > 配网页（`192.168.4.1`）和 STA 状态页（设备局域网 IP）是两个不同的浏览器 origin，localStorage 不会共享。切换到 STA 页面后，把 Token 粘贴到“高级 → MCP Token”并保存即可。
 
-长按 BOOT 5 秒可清除配置并重新配网。
+长按 BOOT 5 秒会恢复出厂：清除 Wi-Fi 配置**并重新生成 Token**，之后需要重新配网。
+
+### 找回 Token
+
+Token 只在生成时完整打印到配网页面，串口日志仅有后 4 位。若已丢失：
+
+```bash
+# 方式一：AP 模式（热点开启时无需鉴权）
+curl -s http://192.168.4.1/api/status | python3 -c "import sys,json;print(json.load(sys.stdin)['mcp_token'])"
+
+# 方式二：已知 Token 时
+curl -s http://<ip>/api/status -H "Authorization: Bearer <token>"
+
+# 方式三：直接读 NVS 分区（不破坏配置）
+esptool.py -p /dev/ttyACM0 read-flash 0x9000 0x6000 /tmp/nvs.bin
+python3 $IDF_PATH/components/nvs_flash/nvs_partition_tool/nvs_tool.py \
+        -d minimal /tmp/nvs.bin | grep mcp_token
+```
+
+> NVS dump 同时包含 Wi-Fi 密码，属于敏感文件，不要外传。
+
 
 ---
 

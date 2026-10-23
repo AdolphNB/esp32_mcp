@@ -116,7 +116,21 @@ esp_err_t gpio_guard_init(void)
         tok = strtok_r(NULL, ",", &save);
     }
 
-    ESP_LOGI(TAG, "allowed GPIO mask=0x%llx", (unsigned long long)s_allowed_mask);
+    char pins[96];
+    size_t off = 0;
+    pins[0] = '\0';
+    for (int i = 0; i <= GPIO_MAX_PIN && off + 4 < sizeof(pins); i++) {
+        if (s_allowed_mask & (1ULL << i)) {
+            int n = snprintf(pins + off, sizeof(pins) - off, "%s%d", off ? "," : "", i);
+            if (n > 0) {
+                off += (size_t)n;
+            }
+        }
+    }
+    /* Log the pin list rather than the raw 64-bit mask: a value like
+     * 0x40002781f0 contains an 8-digit `0x4xxxxxxx` substring that the
+     * idf.py monitor panic decoder mistakes for a ROM address. */
+    ESP_LOGI(TAG, "allowed GPIO pins: %s", pins);
     return ESP_OK;
 }
 
