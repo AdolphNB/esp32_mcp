@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32-S3 MCP Node</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f172a; --card:#111c33; --text:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 64px; }
+  h1 { font-size: 1.45rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .sub { color:var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  .card { background:var(--card); border:1px solid #1f2b45; border-radius:14px; padding:16px; margin:14px 0; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .grow { flex:1 1 220px; }
+  label { display:block; font-size:.82rem; color:var(--muted); margin:10px 0 4px; }
+  input, select, button { font: inherit; }
+  input, select { width:100%; padding:10px 12px; border-radius:9px; border:1px solid #2b3a58; background:#0b1324; color:var(--text); }
+  button { padding:10px 14px; border-radius:9px; border:1px solid #2b3a58; background:#17233c; color:var(--text); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#042234; font-weight:600; }
+  button.danger { background:#3a1620; border-color:#7f1d1d; color:#fecaca; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .pill { display:inline-block; padding:3px 9px; border-radius:999px; font-size:.78rem; border:1px solid #2b3a58; color:var(--muted); }
+  .pill.ok { color:#bbf7d0; border-color:#166534; background:#052e16; }
+  .pill.err { color:#fecaca; border-color:#7f1d1d; background:#3a1620; }
+  .pill.warn { color:#fde68a; border-color:#92400e; background:#3a2a08; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.86rem; }
+  .kv { display:grid; grid-template-columns: 120px 1fr; gap:6px 10px; font-size:.9rem; }
+  .kv div:nth-child(odd) { color:var(--muted); }
+  .urlbox { display:flex; gap:8px; align-items:center; }
+  .urlbox input { flex:1; }
+  .netlist { display:flex; flex-direction:column; gap:6px; max-height:220px; overflow:auto; margin-top:10px; }
+  .net { display:flex; justify-content:space-between; gap:12px; padding:9px 10px; border:1px solid #2b3a58; border-radius:9px; background:#0b1324; cursor:pointer; }
+  .net:hover { border-color:var(--accent); }
+  .net strong { font-weight:600; }
+  .muted { color:var(--muted); }
+  .small { font-size:.8rem; }
+  .progress { height:8px; background:#0b1324; border-radius:999px; overflow:hidden; margin-top:10px; }
+  .progress > div { height:100%; width:0; background:var(--accent); transition:width .2s; }
+  .msg { margin-top:10px; font-size:.88rem; white-space:pre-wrap; }
+  .msg.err { color:#fca5a5; }
+  .msg.ok { color:#86efac; }
+  .hidden { display:none !important; }
+  .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  @media (max-width:560px) { .split { grid-template-columns: 1fr; } .kv { grid-template-columns: 100px 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>ESP32-S3 MCP Node</h1>
+  <div class="sub">Wi-Fi 配网 · MCP 工具 · OTA 升级</div>
+
+  <div class="card">
+    <div class="row">
+      <h2 style="margin:0">设备状态</h2>
+      <span id="statePill" class="pill">loading</span>
+      <span id="fw" class="pill"></span>
+    </div>
+    <div class="kv" style="margin-top:14px">
+      <div>Wi-Fi</div><div id="ssid">-</div>
+      <div>IP</div><div id="ip">-</div>
+      <div>RSSI</div><div id="rssi">-</div>
+      <div>主机名</div><div id="hostname" class="mono">-</div>
+      <div>配网热点</div><div id="ap" class="mono">-</div>
+    </div>
+  </div>
+
+  <div id="setupCard" class="card">
+    <h2>连接 Wi-Fi</h2>
+    <div class="row">
+      <div class="grow">
+        <label for="ssidInput">SSID</label>
+        <input id="ssidInput" autocomplete="off" placeholder="选择下方网络或手动输入">
+      </div>
+      <div class="grow">
+        <label for="passInput">密码</label>
+        <input id="passInput" type="password" autocomplete="current-password" placeholder="开放网络留空">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="scanBtn">扫描 Wi-Fi</button>
+      <button id="connectBtn" class="primary">连接</button>
+    </div>
+    <div id="netlist" class="netlist"></div>
+    <div id="setupMsg" class="msg"></div>
+  </div>
+
+  <div id="connectedCard" class="card hidden">
+    <h2>MCP 接入信息</h2>
+    <label>MCP Endpoint</label>
+    <div class="urlbox">
+      <input id="mcpUrl" readonly class="mono">
+      <button id="copyUrl">复制</button>
+    </div>
+    <label>Bearer Token</label>
+    <div class="urlbox">
+      <input id="mcpToken" readonly class="mono" type="password">
+      <button id="showToken">显示</button>
+      <button id="copyToken">复制</button>
+    </div>
+    <div class="small muted" style="margin-top:10px">
+      Hermes：填写 url + Authorization header；OpenClaw：transport 必须为 streamable-http。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>OTA 固件升级</h2>
+    <div class="small muted" style="margin-bottom:10px">
+      上传 <code>build/esp32_mcp.bin</code>。设备写入备用分区后自动重启；失败会自动回滚。
+    </div>
+    <label for="otaFile">固件文件</label>
+    <input id="otaFile" type="file" accept=".bin,application/octet-stream">
+    <div class="split">
+      <div>
+        <label for="otaSha">SHA256（可选，推荐）</label>
+        <input id="otaSha" class="mono" placeholder="64 位十六进制">
+      </div>
+      <div>
+        <label for="otaVersion">版本（可选）</label>
+        <input id="otaVersion" class="mono" placeholder="0.2.0">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="otaBtn" class="primary">上传并升级</button>
+      <button id="otaAbort" class="danger">取消</button>
+    </div>
+    <div class="progress"><div id="otaBar"></div></div>
+    <div id="otaMsg" class="msg"></div>
+    <div class="kv" style="margin-top:12px">
+      <div>运行分区</div><div id="otaRunning" class="mono">-</div>
+      <div>备用分区</div><div id="otaNext" class="mono">-</div>
+      <div>OTA 状态</div><div id="otaState" class="mono">-</div>
+      <div>上次结果</div><div id="otaLast" class="mono">-</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>高级</h2>
+    <label for="tokenInput">MCP Token（STA 模式下管理操作需要）</label>
+    <div class="urlbox">
+      <input id="tokenInput" class="mono" placeholder="连接成功后自动保存">
+      <button id="saveToken">保存</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="rebootBtn">重启设备</button>
+      <button id="forgetBtn" class="danger">清除 Wi-Fi 并重新配网</button>
+    </div>
+    <div id="globalMsg" class="msg"></div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let token = localStorage.getItem('mcp_token') || '';
+  let pollTimer = null;
+  let lastState = '';
+
+  const authHeaders = () => token ? { 'Authorization': 'Bearer ' + token } : {};
+
+  async function api(path, opts = {}) {
+    const headers = Object.assign({}, opts.headers || {}, authHeaders());
+    const res = await fetch(path, Object.assign({}, opts, { headers }));
+    let body = null;
+    try { body = await res.json(); } catch (e) { body = null; }
+    if (!res.ok) {
+      const msg = body && body.message ? body.message : ('HTTP ' + res.status);
+      throw new Error(msg);
+    }
+    return body;
+  }
+
+  function saveToken(t) {
+    token = (t || '').trim();
+    if (token) localStorage.setItem('mcp_token', token);
+    else localStorage.removeItem('mcp_token');
+    $('tokenInput').value = token;
+  }
+
+  function setMsg(el, text, kind) {
+    el.textContent = text || '';
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  function stateLabel(s) {
+    return ({ provisioning: '配网中', connecting: '连接中', connected: '已连接', error: '连接失败', boot: '启动中' })[s] || s;
+  }
+
+  async function refresh() {
+    try {
+      const s = await api('/api/status');
+      $('statePill').textContent = stateLabel(s.state);
+      $('statePill').className = 'pill ' + (s.state === 'connected' ? 'ok' : (s.state === 'error' ? 'err' : 'warn'));
+      $('fw').textContent = 'v' + (s.fw_version || '?');
+      $('ssid').textContent = s.ssid || '-';
+      $('ip').textContent = s.ip || '-';
+      $('rssi').textContent = s.rssi ? (s.rssi + ' dBm') : '-';
+      $('hostname').textContent = s.hostname || '-';
+      $('ap').textContent = s.ap_ssid ? (s.ap_ssid + (s.ap_active ? ' (开启)' : '')) : '-';
+
+      if (s.mcp_token) {
+        saveToken(s.mcp_token);
+        $('mcpToken').value = s.mcp_token;
+      }
+
+      if (s.state === 'connected') {
+        $('setupCard').classList.add('hidden');
+        $('connectedCard').classList.remove('hidden');
+        $('mcpUrl').value = s.mcp_url || '';
+        $('mcpToken').value = token;
+      } else {
+        $('setupCard').classList.remove('hidden');
+        $('connectedCard').classList.add('hidden');
+      }
+
+      if (s.state !== lastState) {
+        lastState = s.state;
+        if (s.state === 'connected') setMsg($('setupMsg'), 'Wi-Fi 已连接', 'ok');
+        if (s.state === 'error') setMsg($('setupMsg'), '连接失败：' + (s.error || '请检查密码或信号后重试'), 'err');
+      }
+    } catch (e) {
+      $('statePill').textContent = '离线';
+      $('statePill').className = 'pill err';
+    }
+  }
+
+  async function scan() {
+    const list = $('netlist');
+    list.textContent = '';
+    setMsg($('setupMsg'), '扫描中…');
+    try {
+      const data = await api('/api/scan');
+      const nets = (data && data.networks) || [];
+      if (!nets.length) {
+        setMsg($('setupMsg'), '没有扫描到网络');
+        return;
+      }
+      setMsg($('setupMsg'), '');
+      nets.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'net';
+        const left = document.createElement('span');
+        const strong = document.createElement('strong');
+        strong.textContent = n.ssid;
+        left.appendChild(strong);
+        const right = document.createElement('span');
+        right.className = 'muted small';
+        right.textContent = n.rssi + ' dBm · ch ' + n.channel;
+        div.appendChild(left);
+        div.appendChild(right);
+        div.onclick = () => { $('ssidInput').value = n.ssid; $('passInput').focus(); };
+        list.appendChild(div);
+      });
+    } catch (e) {
+      setMsg($('setupMsg'), '扫描失败：' + e.message, 'err');
+    }
+  }
+
+  async function connect() {
+    const ssid = $('ssidInput').value.trim();
+    if (!ssid) { setMsg($('setupMsg'), '请填写 SSID', 'err'); return; }
+    setMsg($('setupMsg'), '正在连接…');
+    $('connectBtn').disabled = true;
+    try {
+      await api('/api/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssid, password: $('passInput').value })
+      });
+      setMsg($('setupMsg'), '已提交，等待获取 IP…');
+      setTimeout(refresh, 1200);
+    } catch (e) {
+      setMsg($('setupMsg'), '连接请求失败：' + e.message, 'err');
+    } finally {
+      $('connectBtn').disabled = false;
+    }
+  }
+
+  async function refreshOta() {
+    try {
+      const s = await api('/api/ota/status');
+      $('otaRunning').textContent = s.running_partition || '-';
+      $('otaNext').textContent = s.next_partition || '-';
+      $('otaState').textContent = s.state + (s.target_version ? ' → ' + s.target_version : '');
+      $('otaLast').textContent = s.last_result || '-';
+      const p = Math.max(0, Math.min(100, Number(s.progress) || 0));
+      $('otaBar').style.width = p + '%';
+      if (s.error) setMsg($('otaMsg'), s.error, 'err');
+      if (s.state === 'ready') setMsg($('otaMsg'), '校验通过，设备即将重启…', 'ok');
+    } catch (e) { /* ignore polling errors */ }
+  }
+
+  function uploadOta() {
+    const file = $('otaFile').files[0];
+    if (!file) { setMsg($('otaMsg'), '请选择 .bin 文件', 'err'); return; }
+    if (!token) { setMsg($('otaMsg'), '请先保存 MCP Token', 'err'); return; }
+    const sha = $('otaSha').value.trim();
+    const version = $('otaVersion').value.trim();
+    if (sha && !/^[0-9a-fA-F]{64}$/.test(sha)) { setMsg($('otaMsg'), 'SHA256 必须是 64 位十六进制', 'err'); return; }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ota');
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    if (sha) xhr.setRequestHeader('X-Firmware-SHA256', sha);
+    if (version) xhr.setRequestHeader('X-Firmware-Version', version);
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) {
+        const p = Math.round(ev.loaded * 100 / ev.total);
+        $('otaBar').style.width = p + '%';
+        setMsg($('otaMsg'), '上传中 ' + p + '%');
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        setMsg($('otaMsg'), '上传完成，设备正在校验并重启…', 'ok');
+      } else {
+        let msg = 'HTTP ' + xhr.status;
+        try { const j = JSON.parse(xhr.responseText); if (j.message) msg = j.message; } catch (e) {}
+        setMsg($('otaMsg'), '升级失败：' + msg, 'err');
+      }
+    };
+    xhr.onerror = () => setMsg($('otaMsg'), '网络错误，上传中断', 'err');
+    setMsg($('otaMsg'), '开始上传…');
+    xhr.send(file);
+  }
+
+  async function abortOta() {
+    try {
+      await api('/api/ota/abort', { method: 'POST' });
+      setMsg($('otaMsg'), '已请求取消', 'ok');
+    } catch (e) {
+      setMsg($('otaMsg'), '取消失败：' + e.message, 'err');
+    }
+  }
+
+  async function reboot() {
+    if (!confirm('确定重启设备？')) return;
+    try { await api('/api/reboot', { method: 'POST' }); setMsg($('globalMsg'), '设备正在重启…', 'ok'); }
+    catch (e) { setMsg($('globalMsg'), '重启失败：' + e.message, 'err'); }
+  }
+
+  async function forget() {
+    if (!confirm('确定清除 Wi-Fi 配置并进入配网模式？')) return;
+    try { await api('/api/forget', { method: 'POST' }); setMsg($('globalMsg'), '已清除，设备正在重启…', 'ok'); }
+    catch (e) { setMsg($('globalMsg'), '操作失败：' + e.message, 'err'); }
+  }
+
+  function copyText(text, btn) {
+    if (!text) return;
+    const done = () => {
+      const old = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(() => btn.textContent = old, 900);
+    };
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  $('scanBtn').onclick = scan;
+  $('connectBtn').onclick = connect;
+  $('otaBtn').onclick = uploadOta;
+  $('otaAbort').onclick = abortOta;
+  $('rebootBtn').onclick = reboot;
+  $('forgetBtn').onclick = forget;
+  $('saveToken').onclick = () => { saveToken($('tokenInput').value); setMsg($('globalMsg'), 'Token 已保存', 'ok'); refresh(); };
+  $('showToken').onclick = () => { const el = $('mcpToken'); el.type = el.type === 'password' ? 'text' : 'password'; };
+  $('copyUrl').onclick = () => copyText($('mcpUrl').value, $('copyUrl'));
+  $('copyToken').onclick = () => copyText($('mcpToken').value, $('copyToken'));
+
+  $('tokenInput').value = token;
+  refresh();
+  refreshOta();
+  pollTimer = setInterval(() => { refresh(); refreshOta(); }, 2000);
+})();
+</script>
+</body>
+</html>

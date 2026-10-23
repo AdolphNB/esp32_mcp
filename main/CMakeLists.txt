@@ -1,0 +1,40 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "nvs_store.c"
+        "wifi_manager.c"
+        "captive_portal.c"
+        "mcp_server.c"
+        "mcp_tools_common.c"
+        "mcp_tools_device.c"
+        "mcp_tools_gpio.c"
+        "mcp_tools_ota.c"
+        "mcp_resources.c"
+        "gpio_guard.c"
+        "led_status.c"
+        "ota.c"
+        "rate_limit.c"
+        "json_util.c"
+        "mdns_service.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_netif
+        esp_event
+        esp_http_server
+        esp_http_client
+        esp_timer
+        esp_driver_gpio
+        app_update
+        mbedtls
+        esp-tls
+        mdns
+        led_strip
+        cjson
+        esp_app_format
+        spi_flash
+        lwip
+        mcp-c-sdk
+    EMBED_TXTFILES "web/index.html"
+)

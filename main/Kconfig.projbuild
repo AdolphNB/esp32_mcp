@@ -1,0 +1,67 @@
+menu "ESP32 MCP Node"
+
+config APP_FW_VERSION
+    string "Firmware version"
+    default "0.1.0"
+
+config APP_MCP_PORT
+    int "MCP HTTP port"
+    default 8080
+
+config APP_WEB_PORT
+    int "Provisioning/status HTTP port"
+    default 80
+
+config APP_AP_PREFIX
+    string "SoftAP SSID prefix"
+    default "ESP32-MCP"
+
+config APP_AP_PASSWORD
+    string "SoftAP password (min 8 chars)"
+    default "esp32mcp"
+
+config APP_HOSTNAME_PREFIX
+    string "mDNS hostname prefix"
+    default "esp32-mcp"
+
+config APP_GPIO_ALLOWLIST
+    string "Allowed GPIO list (comma separated)"
+    default "4,5,6,7,8,15,16,17,18,21,38"
+
+config APP_GPIO_ALLOW_WRITE
+    bool "Allow MCP clients to write GPIO"
+    default y
+
+config APP_LED_GPIO
+    int "WS2812 GPIO"
+    default 48
+
+config APP_MCP_RATE_LIMIT
+    int "MCP calls per second"
+    default 10
+
+config APP_MCP_IN_AP_MODE
+    bool "Expose MCP while in provisioning AP mode"
+    default n
+
+config APP_ENABLE_MDNS
+    bool "Enable mDNS advertisement"
+    default y
+
+config APP_MCP_ALLOW_OTA
+    bool "Allow MCP clients to trigger OTA"
+    default y
+
+config APP_OTA_ALLOWED_URL_PREFIX
+    string "Allowed OTA URL prefix"
+    default "http://192.168.3.110:8000/"
+
+config APP_OTA_ALLOW_DOWNGRADE
+    bool "Allow OTA downgrade"
+    default n
+
+config APP_OTA_HEALTH_TIMEOUT_MS
+    int "OTA health check timeout (ms)"
+    default 30000
+
+endmenu
