@@ -82,7 +82,7 @@ sudo chmod 666 /dev/ttyUSB0
 
 AP 会在 STA 连接成功 2 分钟后自动关闭。Wi-Fi 凭证和 Token 掉电保存。配网成功页会显示 Token，请及时复制；之后也可从串口日志或重新配网获取。
 
-> 配网页（`192.168.4.1`）和 STA 状态页（设备局域网 IP）是两个不同的浏览器 origin，localStorage 不会共享。切换到 STA 页面后，把 Token 粘贴到“高级 → MCP Token”并保存即可。
+> 配网页（`192.168.4.1`）和 STA 状态页（设备局域网 IP）是两个不同的浏览器 origin，localStorage 不会共享。切换到 STA 页面后，把 Token 粘贴到“MCP 接入信息 → Bearer Token”输入框（或“高级 → MCP Token”）即可；粘贴后下方所有配置会实时更新，Token 只保存在本浏览器。
 
 长按 BOOT 5 秒会恢复出厂：清除 Wi-Fi 配置**并重新生成 Token**，之后需要重新配网。
 
