@@ -8,6 +8,7 @@
 #endif
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -38,6 +39,9 @@ static void network_task(void *arg)
             if (mcp_server_start() == ESP_OK) {
                 mcp_started = true;
                 led_status_set(true, "#00FF00", 10);
+                ESP_LOGI(TAG, "runtime heap: internal=%u KB, psram=%u KB",
+                         (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+                         (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
             } else {
                 vTaskDelay(pdMS_TO_TICKS(5000));
                 continue;
@@ -121,6 +125,9 @@ void app_main(void)
 
     ESP_ERROR_CHECK(rate_limit_init(CONFIG_APP_MCP_RATE_LIMIT, CONFIG_APP_MCP_RATE_LIMIT * 2));
     ESP_ERROR_CHECK(mcp_server_init());
+    ESP_LOGI(TAG, "boot heap: internal=%u KB, psram=%u KB",
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
 
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(captive_portal_start());

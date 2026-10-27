@@ -117,6 +117,12 @@ static esp_err_t sys_status_cb(const esp_mcp_property_list_t *properties, esp_mc
     cJSON_AddNumberToObject(root, "min_free_heap_kb", esp_get_minimum_free_heap_size() / 1024);
     cJSON_AddNumberToObject(root, "largest_free_block_kb",
                             heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) / 1024);
+    cJSON_AddNumberToObject(root, "free_internal_kb",
+                            heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
+    cJSON_AddNumberToObject(root, "free_psram_kb",
+                            heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024);
+    cJSON_AddNumberToObject(root, "largest_psram_block_kb",
+                            heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024);
     cJSON_AddNumberToObject(root, "task_count", uxTaskGetNumberOfTasks());
     cJSON_AddNumberToObject(root, "cpu_freq_mhz", CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
     cJSON_AddStringToObject(root, "reset_reason", reset_reason_str(esp_reset_reason()));

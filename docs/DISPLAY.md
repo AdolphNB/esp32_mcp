@@ -274,7 +274,65 @@ main/
 5. I2C / RS485 / CAN / 隔离 IO 工具
 6. 配网页“显示”页与屏幕预览
 
-## 8. P0 实机检查清单
+## 8. 内存预算
+
+### 8.1 当前 mock 构建（未接 LVGL）
+
+`idf.py -B build-43b size` 的典型结果：
+
+| 区域 | 已用 | 余量 | 说明 |
+| --- | --- | --- | --- |
+| DIRAM | ~100 KB | ~241 KB | 内部 SRAM，真正的运行时堆来源 |
+| Flash Code | ~900 KB | 4 MB 分区内 | LVGL 会再增加 ~700–900 KB |
+| Flash Data | ~287 KB | | 字体不放 app，放 storage |
+
+> `size` 里的 `IRAM 16384 / 100%` 是 esp-idf-size 的**统计桶**，不是整个 IRAM。
+> 实际 map 中 `iram0_0_seg` 为 358 KB，当前只用了约 68 KB（19%），
+> 链接器的 IRAM 溢出断言没有触发。LVGL 本身不占 IRAM，只有少量 `IRAM_ATTR` 回调
+> （例如 RGB vsync）会用到，余量足够。
+
+### 8.2 接入 LVGL 后的预算
+
+PSRAM（8 MB）：
+
+| 项目 | 估算 |
+| --- | --- |
+| RGB 双 framebuffer（800×480×2×2） | 1.5 MB |
+| 中文字体（26/32/48，压缩 binfont） | 2.5–3.0 MB |
+| LVGL 堆 / 对象 / 图片解码 | 0.8–1.2 MB |
+| 场景 JSON、页面、队列 | 0.2 MB |
+| 余量 | ≥ 1.5 MB |
+
+内部 SRAM（DIRAM 余量 ~241 KB 起）：
+
+| 项目 | 估算 |
+| --- | --- |
+| Wi-Fi + lwIP | 70–100 KB |
+| MCP / HTTP / mDNS | 40–60 KB |
+| LVGL task stack | 8–16 KB |
+| RGB bounce buffer（10 行） | 16 KB |
+| 触摸 / I2C / CH422G | 4 KB |
+| UI / 时钟 / JSON 解析 | 12–20 KB |
+| 余量 | 30–60 KB |
+
+结论：**PSRAM 充足，内部 SRAM 偏紧但可满足**。关键措施：
+
+- LVGL 使用 RGB **direct mode**，framebuffer 全部在 PSRAM，不额外分配内部 draw buffer。
+- LVGL/UI 任务栈优先放 PSRAM（`CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y`）。
+- 字体从 SPIFFS 加载到 PSRAM；场景 JSON 也放 PSRAM。
+- LVGL 只编译用到的 widget，关闭 demo、动画、多余字体。
+- 显示构建已关闭 `ESP_WIFI_IRAM_OPT` / `ESP_WIFI_RX_IRAM_OPT` / `ESP_TIMER_IN_IRAM`，把约 18 KB 从 IRAM 挪回可用空间；如 Wi-Fi 吞吐仍够用就保持关闭。
+- 如果内部堆低于 40 KB，再考虑 `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y`，把 Wi-Fi/lwIP 缓冲移到 PSRAM。
+
+### 8.3 运行时观测
+
+- 启动日志会打印：
+  `boot heap: internal=... KB, psram=... KB`
+  `runtime heap: internal=... KB, psram=... KB`
+- MCP `sys_status` 返回 `free_internal_kb`、`free_psram_kb`、`largest_psram_block_kb`。
+- 目标：LVGL 跑起来后 `free_internal_kb ≥ 40`，`largest_psram_block_kb ≥ 300`。
+
+## 9. P0 实机检查清单
 
 板子到货后按顺序做，先排除硬件问题，再排查软件：
 
