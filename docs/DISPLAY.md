@@ -273,3 +273,31 @@ main/
 4. 图片/二维码后端
 5. I2C / RS485 / CAN / 隔离 IO 工具
 6. 配网页“显示”页与屏幕预览
+
+## 8. P0 实机检查清单
+
+板子到货后按顺序做，先排除硬件问题，再排查软件：
+
+1. **官方 demo**：用 ESP-IDF 5.5.2 烧 `08_lvgl_Porting` 或 `09_lvgl_v9_demo`
+   - 屏亮、颜色正常
+   - 触摸四角坐标准确
+   - 背光可开/关
+2. **RTC**：装 CR927，烧 `04_RTC_Test`
+   - 读写时间正常
+   - 断电 30 秒再上电，时间继续走
+3. **隔离 IO**：烧 `05_IO_Test`
+   - DO 接 5V LED + 电阻，能亮/灭
+   - DI 接 5V 开关，状态能读回
+4. **RS485**：烧 `02_RS485_Test`，USB-RS485 回环
+5. **CAN**：烧 `06/07_TWAI`，USB-CAN-A 收发
+6. **我们的固件**：
+   ```bash
+   idf.py -B build-43b -p /dev/ttyACM0 flash monitor
+   ```
+   检查日志：`board=waveshare_43b`、CH422G、`rtc=yes`、`SPIFFS ready`、`MCP Streamable HTTP ready`
+7. **MCP 端到端**：
+   ```bash
+   python3 tools/test_display.py --url http://<ip>:8080/mcp --token <token>
+   ```
+   检查 `display_quote` / `display_todo` / `display_calendar` 是否返回 `ok`，以及 mock 日志是否打印 page/widgets。
+8. **性能**：Wi-Fi + MCP + UI 同时跑，记录 free heap、PSRAM、FPS（LVGL 后端接入后）。
