@@ -1,7 +1,11 @@
 #include <stdio.h>
 
 #include "app_config.h"
+#include "board.h"
 #include "captive_portal.h"
+#if CONFIG_APP_ENABLE_DISPLAY
+#include "clock_service.h"
+#endif
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
@@ -15,6 +19,9 @@
 #include "nvs_store.h"
 #include "ota.h"
 #include "rate_limit.h"
+#if CONFIG_APP_ENABLE_DISPLAY
+#include "ui_service.h"
+#endif
 #include "wifi_manager.h"
 
 static const char *TAG = "app";
@@ -36,6 +43,11 @@ static void network_task(void *arg)
                 continue;
             }
         }
+#if CONFIG_APP_ENABLE_DISPLAY
+        if (connected) {
+            clock_service_start_sntp();
+        }
+#endif
         if (connected && mcp_started && !mdns_started) {
             if (mdns_service_start() == ESP_OK) {
                 mdns_started = true;
@@ -92,12 +104,20 @@ void app_main(void)
 
     ESP_ERROR_CHECK(nvs_store_init());
     ESP_ERROR_CHECK(ota_init());
+    ESP_ERROR_CHECK(board_init());
+
+#if CONFIG_APP_ENABLE_DISPLAY
+    ESP_ERROR_CHECK(clock_service_init());
+    ESP_ERROR_CHECK(ui_service_init());
+#endif
 
     ESP_ERROR_CHECK(gpio_guard_init());
-    led_status_init();
-    led_status_set(true, "#0000FF", 10);
-    vTaskDelay(pdMS_TO_TICKS(250));
-    led_status_set(false, NULL, 0);
+    if (CONFIG_APP_LED_GPIO >= 0) {
+        led_status_init();
+        led_status_set(true, "#0000FF", 10);
+        vTaskDelay(pdMS_TO_TICKS(250));
+        led_status_set(false, NULL, 0);
+    }
 
     ESP_ERROR_CHECK(rate_limit_init(CONFIG_APP_MCP_RATE_LIMIT, CONFIG_APP_MCP_RATE_LIMIT * 2));
     ESP_ERROR_CHECK(mcp_server_init());
@@ -107,7 +127,9 @@ void app_main(void)
     ESP_ERROR_CHECK(wifi_manager_start());
 
     xTaskCreate(network_task, "network_task", 8192, NULL, 4, NULL);
+#if !CONFIG_APP_BOARD_WAVESHARE_43B
     xTaskCreate(factory_reset_task, "factory_reset", 3072, NULL, 2, NULL);
+#endif
 
     ESP_LOGI(TAG, "boot complete, state=%s", wifi_manager_state_str());
 }

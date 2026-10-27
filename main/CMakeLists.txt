@@ -9,6 +9,8 @@ idf_component_register(
         "mcp_tools_device.c"
         "mcp_tools_gpio.c"
         "mcp_tools_ota.c"
+        "mcp_tools_display.c"
+        "mcp_tools_io.c"
         "mcp_resources.c"
         "gpio_guard.c"
         "led_status.c"
@@ -16,6 +18,8 @@ idf_component_register(
         "rate_limit.c"
         "json_util.c"
         "mdns_service.c"
+        "clock_service.c"
+        "lunar.c"
     INCLUDE_DIRS "."
     REQUIRES
         nvs_flash
@@ -36,5 +40,7 @@ idf_component_register(
         spi_flash
         lwip
         mcp-c-sdk
+        app_board
+        app_ui
     EMBED_TXTFILES "web/index.html"
 )

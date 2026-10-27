@@ -20,7 +20,7 @@ static esp_err_t gpio_list_cb(const esp_mcp_property_list_t *properties, esp_mcp
     if (!root) {
         return mcp_tool_reply_error(result, "internal", "out of memory");
     }
-    cJSON_AddBoolToObject(root, "writable", CONFIG_APP_GPIO_ALLOW_WRITE);
+    cJSON_AddBoolToObject(root, "writable", APP_GPIO_ALLOW_WRITE);
     cJSON *pins = cJSON_AddArrayToObject(root, "pins");
     mcp_gpio_snapshot_fill(pins);
     return mcp_tool_reply(result, root, false);

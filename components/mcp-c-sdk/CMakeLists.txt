@@ -30,3 +30,7 @@ idf_component_register(SRCS "${srcs}"
                        PRIV_INCLUDE_DIRS "${priv_includes}"
                        REQUIRES "${req}"
                        PRIV_REQUIRES "${priv_req}")
+
+# The vendored SDK uses fixed-size strncpy() calls. With -O2 and IDF's
+# -Werror this is reported as stringop-truncation; keep it a warning.
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=stringop-truncation)

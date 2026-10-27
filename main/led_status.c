@@ -40,6 +40,10 @@ static bool parse_color(const char *text, uint8_t *r, uint8_t *g, uint8_t *b)
 
 esp_err_t led_status_init(void)
 {
+    if (APP_LED_GPIO < 0) {
+        ESP_LOGI(TAG, "no status LED on this board");
+        return ESP_ERR_INVALID_STATE;
+    }
     s_lock = xSemaphoreCreateMutex();
     if (!s_lock) {
         return ESP_ERR_NO_MEM;

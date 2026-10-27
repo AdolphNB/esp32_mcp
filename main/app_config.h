@@ -11,6 +11,21 @@
 #define APP_HOSTNAME_PREFIX   CONFIG_APP_HOSTNAME_PREFIX
 #define APP_GPIO_ALLOWLIST    CONFIG_APP_GPIO_ALLOWLIST
 #define APP_LED_GPIO          CONFIG_APP_LED_GPIO
+#ifdef CONFIG_APP_GPIO_ALLOW_WRITE
+#define APP_GPIO_ALLOW_WRITE  1
+#else
+#define APP_GPIO_ALLOW_WRITE  0
+#endif
+
+#define APP_BOARD_ID          (CONFIG_APP_BOARD_WAVESHARE_43B ? "waveshare_43b" : "yd_s3")
+#define APP_DISPLAY_ENABLED   CONFIG_APP_ENABLE_DISPLAY
+#define APP_DISPLAY_MAX_PAGES CONFIG_APP_DISPLAY_MAX_PAGES
+#define APP_DISPLAY_TIMEZONE  CONFIG_APP_DISPLAY_TIMEZONE
+#ifdef CONFIG_APP_DISPLAY_ALLOW_DO_WRITE
+#define APP_DISPLAY_ALLOW_DO_WRITE 1
+#else
+#define APP_DISPLAY_ALLOW_DO_WRITE 0
+#endif
 
 #define APP_NVS_KEY_SSID          "wifi_ssid"
 #define APP_NVS_KEY_PASS          "wifi_pass"
@@ -23,6 +38,10 @@
 #define APP_NVS_KEY_OTA_RESULT    "ota_result"
 #define APP_NVS_KEY_OTA_VERSION   "ota_version"
 #define APP_NVS_KEY_OTA_ERROR     "ota_error"
+#define APP_NVS_KEY_UI_PAGE       "ui_page"
+#define APP_NVS_KEY_UI_BRIGHTNESS "ui_bright"
+#define APP_NVS_KEY_UI_BACKLIGHT  "ui_bl"
+#define APP_NVS_KEY_UI_SYNCED     "ui_synced"
 
 #define APP_TOKEN_LEN 32
 #define APP_VERSION_LEN 32

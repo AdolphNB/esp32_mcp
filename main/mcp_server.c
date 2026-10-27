@@ -37,18 +37,32 @@ esp_err_t mcp_server_init(void)
 
     esp_mcp_set_server_info(s_mcp,
         "ESP32-S3 MCP Node",
+#if CONFIG_APP_ENABLE_DISPLAY
+        "Wi-Fi connected ESP32-S3 desk display exposing UI, calendar, todo, GPIO, "
+        "isolated IO and OTA tools.",
+#else
         "Wi-Fi connected ESP32-S3 device exposing status, GPIO, WS2812 and OTA tools.",
+#endif
         NULL, NULL);
 
     esp_mcp_set_instructions(s_mcp,
         "This device controls only GPIO pins listed by gpio_list. "
         "Prefer read-only tools first. GPIO writes are physically actuating. "
+#if CONFIG_APP_ENABLE_DISPLAY
+        "Use display_render for custom screens, or display_calendar/display_todo/"
+        "display_quote/display_horoscope for designed templates. "
+        "display_info reports the current page and clock. "
+#endif
         "ota_apply is destructive: it downloads firmware from an allowlisted LAN URL, "
         "requires the exact SHA256 and confirm=OTA, then reboots the device.");
 
     mcp_register_device_tools(s_mcp);
     mcp_register_gpio_tools(s_mcp);
     mcp_register_ota_tools(s_mcp);
+#if CONFIG_APP_ENABLE_DISPLAY
+    mcp_register_display_tools(s_mcp);
+    mcp_register_io_tools(s_mcp);
+#endif
     mcp_register_resources(s_mcp);
 
     ESP_LOGI(TAG, "MCP engine initialized");
@@ -67,9 +81,9 @@ esp_err_t mcp_server_start(void)
     httpd_config_t http_cfg = HTTPD_DEFAULT_CONFIG();
     http_cfg.server_port = APP_MCP_PORT;
     http_cfg.ctrl_port = 32769; /* portal uses the default 32768 */
-    http_cfg.max_open_sockets = 6;
+    http_cfg.max_open_sockets = 8;
     http_cfg.max_uri_handlers = 12;
-    http_cfg.stack_size = 8192;
+    http_cfg.stack_size = 12288;
     http_cfg.lru_purge_enable = true;
 
     esp_mcp_mgr_config_t cfg = {

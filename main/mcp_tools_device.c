@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "app_config.h"
+#include "board.h"
 #include "esp_app_desc.h"
 #include "esp_chip_info.h"
 #include "esp_flash.h"
@@ -83,6 +84,14 @@ void mcp_device_info_fill(cJSON *root)
     cJSON_AddNumberToObject(root, "flash_size_kb", flash_size / 1024);
     cJSON_AddNumberToObject(root, "free_heap_kb", esp_get_free_heap_size() / 1024);
     cJSON_AddStringToObject(root, "hostname", nvs_store_get_hostname());
+    const board_desc_t *board = board_get();
+    if (board) {
+        cJSON_AddStringToObject(root, "board", board->id);
+        cJSON_AddStringToObject(root, "board_name", board->name);
+        cJSON_AddBoolToObject(root, "display", board->has_display);
+        cJSON_AddBoolToObject(root, "rtc", board->has_rtc);
+        cJSON_AddBoolToObject(root, "isolated_io", board->has_isolated_io);
+    }
 }
 
 static esp_err_t device_info_cb(const esp_mcp_property_list_t *properties, esp_mcp_tool_result_t *result)

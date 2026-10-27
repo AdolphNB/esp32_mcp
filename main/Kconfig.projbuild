@@ -1,5 +1,66 @@
 menu "ESP32 MCP Node"
 
+choice APP_BOARD
+    prompt "Board profile"
+    default APP_BOARD_YD_S3
+    config APP_BOARD_YD_S3
+        bool "YD-ESP32-S3 N16R8 (no LCD)"
+    config APP_BOARD_WAVESHARE_43B
+        bool "Waveshare ESP32-S3-Touch-LCD-4.3B"
+endchoice
+
+config APP_ENABLE_DISPLAY
+    bool "Enable LCD display and UI"
+    default n
+
+choice APP_DISPLAY_BACKEND
+    depends on APP_ENABLE_DISPLAY
+    prompt "Display backend"
+    default APP_DISPLAY_BACKEND_MOCK
+    config APP_DISPLAY_BACKEND_MOCK
+        bool "Mock backend (logs only, no LCD)"
+    config APP_DISPLAY_BACKEND_LVGL
+        bool "LVGL RGB backend"
+endchoice
+
+config APP_DISPLAY_MAX_PAGES
+    depends on APP_ENABLE_DISPLAY
+    int "Maximum UI pages"
+    range 1 8
+    default 4
+
+config APP_DISPLAY_MAX_SCENE_BYTES
+    depends on APP_ENABLE_DISPLAY
+    int "Maximum scene JSON size"
+    range 2048 32768
+    default 16384
+
+config APP_DISPLAY_DEFAULT_BRIGHTNESS
+    depends on APP_ENABLE_DISPLAY
+    int "Default brightness (0-100)"
+    range 0 100
+    default 70
+
+config APP_DISPLAY_TIMEZONE
+    depends on APP_ENABLE_DISPLAY
+    string "Timezone (POSIX TZ)"
+    default "CST-8"
+
+config APP_DISPLAY_NTP_SERVER
+    depends on APP_ENABLE_DISPLAY
+    string "NTP server"
+    default "pool.ntp.org"
+
+config APP_DISPLAY_ALLOW_DO_WRITE
+    depends on APP_ENABLE_DISPLAY
+    bool "Allow MCP clients to write isolated DO outputs"
+    default n
+
+config APP_DISPLAY_IMAGE_URL_PREFIX
+    depends on APP_ENABLE_DISPLAY
+    string "Allowed image URL prefix (empty = disabled)"
+    default ""
+
 config APP_FW_VERSION
     string "Firmware version"
     default "0.1.0"
