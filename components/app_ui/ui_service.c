@@ -30,6 +30,7 @@ typedef struct {
 
 static ui_page_t s_pages[CONFIG_APP_DISPLAY_MAX_PAGES];
 static SemaphoreHandle_t s_lock;
+static StaticSemaphore_t s_lock_buf;
 static nvs_handle_t s_nvs;
 static bool s_nvs_ready;
 static bool s_fs_ready;
@@ -190,7 +191,7 @@ esp_err_t ui_service_init(void)
     if (s_lock) {
         return ESP_OK;
     }
-    s_lock = xSemaphoreCreateMutex();
+    s_lock = xSemaphoreCreateMutexStatic(&s_lock_buf);
     if (!s_lock) {
         return ESP_ERR_NO_MEM;
     }
