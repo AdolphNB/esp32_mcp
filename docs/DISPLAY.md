@@ -241,6 +241,23 @@ FONT=/path/to/NotoSansCJKsc-Regular.otf ./tools/gen_fonts.sh
 - `list.items` ≤ 16，`calendar.events` ≤ 8
 - 未知组件类型直接拒绝
 
+### 4.4 开机 Logo
+
+开机后先显示“奇点临近 / SINGULARITY NEAR”Logo，约 1 秒后进入配网页或仪表盘。
+
+- 源文件：`data/brand/brand-mark.svg`（官网 brand mark）
+- 预览：`data/brand/logo_boot.png`
+- 固件资源：`components/app_ui/assets/logo_boot.bin`（460×150，RGB565，背景 `#0B141B`），由 `EMBED_FILES` 编进 app
+- 重新生成：
+
+```bash
+./tools/gen_boot_logo.py
+```
+
+依赖 Pillow、node/npx（`sharp-cli` 把 SVG 转 PNG）和 Noto Sans CJK 字体；字体路径可用 `CJK_FONT` / `LATIN_FONT` 覆盖。
+
+Logo 资源在 app 分区，普通 `idf.py flash` 或 `idf.py app-flash` 都会更新。
+
 ## 5. MCP 工具
 
 | 工具 | 说明 |

@@ -16,6 +16,8 @@
 #include "esp_lcd_touch_gt911.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lvgl.h"
 #include "provisioning_ui.h"
 #include "ui_lvgl.h"
@@ -31,6 +33,8 @@ static const char *TAG = "ui_lvgl";
 #define COL_HIGH    0xF85149
 #define COL_NORMAL  0xD29922
 #define COL_LOW     0x8B949E
+
+extern const lv_image_dsc_t ui_boot_logo;
 
 static lv_display_t *s_disp;
 static lv_obj_t *s_scene_screen;
@@ -982,13 +986,20 @@ static esp_err_t lcd_init(void)
 
     if (ui_lvgl_lock(2000)) {
         s_boot_screen = lv_obj_create(NULL);
-        lv_obj_set_style_bg_color(s_boot_screen, lv_color_hex(0x1F6FEB), 0);
+        lv_obj_set_style_bg_color(s_boot_screen, lv_color_hex(0x0B141B), 0);
         lv_obj_set_style_bg_opa(s_boot_screen, LV_OPA_COVER, 0);
-        lv_obj_t *label = lv_label_create(s_boot_screen);
-        lv_label_set_text(label, "LVGL OK\n800x480");
-        lv_obj_set_style_text_color(label, lv_color_white(), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
-        lv_obj_center(label);
+        lv_obj_remove_flag(s_boot_screen, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *logo = lv_image_create(s_boot_screen);
+        lv_image_set_src(logo, &ui_boot_logo);
+        lv_obj_center(logo);
+
+        lv_obj_t *version = lv_label_create(s_boot_screen);
+        lv_label_set_text_fmt(version, "ESP32-S3 MCP  v%s", CONFIG_APP_FW_VERSION);
+        lv_obj_set_style_text_color(version, lv_color_hex(0x5E7180), 0);
+        lv_obj_set_style_text_font(version, &lv_font_montserrat_20, 0);
+        lv_obj_align(version, LV_ALIGN_BOTTOM_MID, 0, -34);
+
         lv_screen_load(s_boot_screen);
         ui_lvgl_unlock();
         ESP_LOGI(TAG, "boot screen shown");
@@ -1029,6 +1040,8 @@ static esp_err_t lvgl_init(void)
         return err;
     }
     load_fonts();
+    /* Keep the boot logo visible for a moment before the first scene loads. */
+    vTaskDelay(pdMS_TO_TICKS(600));
     if (ui_lvgl_lock(2000)) {
         dim_update();
         ui_lvgl_unlock();
