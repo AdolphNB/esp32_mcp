@@ -17,8 +17,9 @@ extern "C" {
 #define CH422G_ADDR_IN   0x26
 
 #define CH422G_MODE_IO_OUTPUT 0x01
-#define CH422G_MODE_OD_ENABLE 0x04
-#define CH422G_MODE_SLEEP     0x08
+#define CH422G_MODE_A_SCAN    0x04
+#define CH422G_MODE_OD_ENABLE 0x10
+#define CH422G_MODE_SLEEP     0x80
 
 /* IO output bits */
 #define CH422G_IO0 0x01 /* isolated DI0 */
