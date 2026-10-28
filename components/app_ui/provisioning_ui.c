@@ -147,38 +147,40 @@ static void open_password(const char *ssid)
     lv_obj_set_style_bg_opa(s_pwd_screen, LV_OPA_COVER, 0);
     lv_obj_remove_flag(s_pwd_screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *title = make_status(s_pwd_screen, 24, 18, 752, 40, s_pwd_ssid);
+    lv_obj_t *title = make_status(s_pwd_screen, 24, 8, 752, 34, s_pwd_ssid);
     lv_obj_set_style_text_color(title, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_font(title, ui_lvgl_cjk_font(), 0);
 
     s_pwd_ta = lv_textarea_create(s_pwd_screen);
-    lv_obj_set_pos(s_pwd_ta, 24, 74);
-    lv_obj_set_size(s_pwd_ta, 752, 52);
+    lv_obj_set_pos(s_pwd_ta, 24, 44);
+    lv_obj_set_size(s_pwd_ta, 752, 48);
     lv_textarea_set_one_line(s_pwd_ta, true);
     lv_textarea_set_password_mode(s_pwd_ta, true);
     lv_textarea_set_placeholder_text(s_pwd_ta, "Wi-Fi 密码");
     lv_obj_set_style_text_font(s_pwd_ta, ui_lvgl_cjk_font(), 0);
 
     lv_obj_t *cb = lv_checkbox_create(s_pwd_screen);
-    lv_obj_set_pos(cb, 24, 136);
+    lv_obj_set_pos(cb, 24, 98);
     lv_checkbox_set_text(cb, "显示密码");
     lv_obj_set_style_text_font(cb, ui_lvgl_cjk_font(), 0);
     lv_obj_set_style_text_color(cb, lv_color_hex(COL_MUTED), 0);
     lv_obj_add_event_cb(cb, pwd_show_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    lv_obj_t *cancel = make_button(s_pwd_screen, 24, 416, 120, 44, "取消");
+    lv_obj_t *cancel = make_button(s_pwd_screen, 24, 430, 140, 40, "取消");
     lv_obj_add_event_cb(cancel, pwd_cancel_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *connect = make_button(s_pwd_screen, 656, 416, 120, 44, "连接");
+    lv_obj_t *connect = make_button(s_pwd_screen, 636, 430, 140, 40, "连接");
     lv_obj_set_style_bg_color(connect, lv_color_hex(COL_ACCENT), 0);
     lv_obj_add_event_cb(connect, pwd_connect_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *kb = lv_keyboard_create(s_pwd_screen);
-    lv_obj_set_pos(kb, 24, 160);
-    lv_obj_set_size(kb, 752, 248);
+    lv_obj_set_pos(kb, 8, 126);
+    lv_obj_set_size(kb, 784, 296);
+    lv_obj_set_style_pad_all(kb, 4, 0);
+    lv_obj_set_style_pad_row(kb, 2, 0);
     lv_keyboard_set_textarea(kb, s_pwd_ta);
     lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
-    lv_obj_set_style_text_font(kb, ui_lvgl_cjk_font(), 0);
-    lv_obj_set_style_text_font(kb, ui_lvgl_cjk_font(), LV_PART_ITEMS);
+    lv_obj_set_style_text_font(kb, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(kb, &lv_font_montserrat_20, LV_PART_ITEMS);
     lv_obj_add_event_cb(kb, pwd_ready_cb, LV_EVENT_READY, NULL);
 
     lv_screen_load(s_pwd_screen);
