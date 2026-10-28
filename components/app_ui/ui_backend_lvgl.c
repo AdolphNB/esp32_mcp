@@ -693,12 +693,21 @@ static void render_quote(lv_obj_t *parent, const cJSON *w, int x, int y, int ww,
     int ch = hh - 24;
     const char *text = jstr(w, "text", "");
     int size = jint(w, "size", 48);
-    make_label(card, 0, 0, cw, ch * 70 / 100, text, font_for(text, size),
-               COL_TEXT, LV_TEXT_ALIGN_CENTER);
-    char author[96];
     const char *a = jstr(w, "author", "");
     const char *src = jstr(w, "source", "");
-    if (a[0] || src[0]) {
+    bool has_author = a[0] || src[0];
+
+    /* Auto-height label + center alignment keeps the quote vertically centered
+     * in the card; with an author/source, center it in the area above them. */
+    lv_obj_t *quote = make_label(card, 0, 0, cw, ch * 70 / 100, text,
+                                 font_for(text, size), COL_TEXT, LV_TEXT_ALIGN_CENTER);
+    if (quote) {
+        lv_obj_set_height(quote, LV_SIZE_CONTENT);
+        lv_obj_align(quote, LV_ALIGN_CENTER, 0, has_author ? -(ch * 12 / 100) : 0);
+    }
+
+    char author[96];
+    if (has_author) {
         if (a[0] && src[0]) {
             snprintf(author, sizeof(author), "—— %s《%s》", a, src);
         } else if (a[0]) {
