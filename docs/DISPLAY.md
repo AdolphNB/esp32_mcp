@@ -398,10 +398,22 @@ PSRAM（8 MB）：
    ```bash
    idf.py -B build-43b -p /dev/ttyACM0 flash monitor
    ```
-   检查日志：`board=waveshare_43b`、CH422G、`rtc=yes`、`SPIFFS ready`、`MCP Streamable HTTP ready`
-7. **MCP 端到端**：
+   检查日志：`board=waveshare_43b`、CH422G、`rtc=yes`、`SPIFFS ready`、`loaded CJK font`、`MCP Streamable HTTP ready`
+7. **屏上配网**：
+   - 首次启动应直接出现“连接 Wi-Fi”
+   - 点“重新扫描”，选择 2.4 GHz SSID
+   - 输入密码并连接，成功后显示 IP + Token
+   - 点“进入桌面”回到仪表盘
+   - 点右下角“设置”能再次打开配网页
+   - 点“手机配网”能临时启动 SoftAP（备用）
+8. **MCP 端到端**：
    ```bash
    python3 tools/test_display.py --url http://<ip>:8080/mcp --token <token>
    ```
-   检查 `display_quote` / `display_todo` / `display_calendar` 是否返回 `ok`，以及 mock 日志是否打印 page/widgets。
-8. **性能**：Wi-Fi + MCP + UI 同时跑，记录 free heap、PSRAM、FPS（LVGL 后端接入后）。
+   检查 `display_quote` / `display_todo` / `display_calendar` 是否返回 `ok`，以及屏幕是否出现对应卡片。
+9. **性能**：Wi-Fi + MCP + UI 同时跑，记录 free heap、PSRAM、FPS。
+
+> 如果屏幕没有出现配网页，先看串口日志：
+> - `ui_lvgl: RGB+LVGL ready` 说明显示初始化成功
+> - `prov_backend: on-screen provisioning backend ready` 说明配网 UI 已注册
+> - 如果 `display UI init failed`，固件会自动回退到 SoftAP 配网
