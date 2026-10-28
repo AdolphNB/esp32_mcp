@@ -124,6 +124,13 @@ static void get_status_cb(provisioning_status_t *out)
     copy_str(out->ap_ssid, sizeof(out->ap_ssid), wifi_manager_get_ap_ssid());
     copy_str(out->ap_password, sizeof(out->ap_password), CONFIG_APP_AP_PASSWORD);
     copy_str(out->token, sizeof(out->token), nvs_store_get_token());
+    snprintf(out->mdns_url, sizeof(out->mdns_url), "http://%s.local:%d/mcp",
+             nvs_store_get_hostname(), APP_MCP_PORT);
+    if (strcmp(out->state, "connected") == 0 && out->ip[0]) {
+        snprintf(out->mcp_url, sizeof(out->mcp_url), "http://%s:%d/mcp",
+                 out->ip, APP_MCP_PORT);
+        snprintf(out->web_url, sizeof(out->web_url), "http://%s/", out->ip);
+    }
 }
 
 static esp_err_t softap_cb(void)

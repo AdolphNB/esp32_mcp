@@ -27,13 +27,16 @@ static lv_obj_t *s_screen;
 static lv_obj_t *s_list;
 static lv_obj_t *s_status;
 static lv_obj_t *s_done_btn;
+static lv_obj_t *s_mcp_btn;
 static lv_obj_t *s_pwd_screen;
 static lv_obj_t *s_pwd_ta;
+static lv_obj_t *s_mcp_screen;
 static char s_pwd_ssid[33];
 static lv_timer_t *s_timer;
 static provisioning_scan_item_t s_items[CONFIG_APP_WIFI_SCAN_MAX];
 static bool s_visible;
 static bool s_was_busy;
+static bool s_was_connected;
 
 static void style_button(lv_obj_t *btn)
 {
@@ -70,6 +73,102 @@ static lv_obj_t *make_status(lv_obj_t *parent, int x, int y, int w, int h, const
     lv_obj_set_style_text_color(l, lv_color_hex(COL_MUTED), 0);
     lv_obj_set_style_text_line_space(l, 4, 0);
     return l;
+}
+
+static lv_obj_t *make_text(lv_obj_t *parent, int x, int y, int w, int h,
+                           const lv_font_t *font, uint32_t color, const char *text)
+{
+    lv_obj_t *l = lv_label_create(parent);
+    lv_obj_set_pos(l, x, y);
+    lv_obj_set_size(l, w, h);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_CLIP);
+    lv_label_set_text(l, text ? text : "");
+    lv_obj_set_style_text_font(l, font, 0);
+    lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
+    return l;
+}
+
+static void mcp_done_cb(lv_event_t *e)
+{
+    (void)e;
+    provisioning_ui_hide();
+}
+
+static void mcp_back_cb(lv_event_t *e)
+{
+    (void)e;
+    if (s_mcp_screen) {
+        lv_obj_del_async(s_mcp_screen);
+        s_mcp_screen = NULL;
+    }
+    if (s_screen) {
+        lv_screen_load(s_screen);
+    }
+}
+
+static void open_mcp_info(void)
+{
+    if (!s_backend || !ui_lvgl_lock(1000)) {
+        return;
+    }
+    provisioning_status_t st = {0};
+    s_backend->get_status(&st);
+    if (!st.ip[0]) {
+        ui_lvgl_unlock();
+        return;
+    }
+    if (s_mcp_screen) {
+        lv_obj_del_async(s_mcp_screen);
+        s_mcp_screen = NULL;
+    }
+
+    s_mcp_screen = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(s_mcp_screen, lv_color_hex(COL_BG), 0);
+    lv_obj_set_style_bg_opa(s_mcp_screen, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(s_mcp_screen, LV_OBJ_FLAG_SCROLLABLE);
+
+    make_text(s_mcp_screen, 24, 12, 560, 38, ui_lvgl_cjk_font(), COL_ACCENT,
+              "MCP 服务已就绪");
+    make_text(s_mcp_screen, 24, 54, 752, 30, ui_lvgl_cjk_font(), COL_MUTED,
+              "在 PC 的 MCP 客户端中添加 Streamable HTTP 服务器");
+
+    lv_obj_t *card = lv_obj_create(s_mcp_screen);
+    lv_obj_set_pos(card, 24, 92);
+    lv_obj_set_size(card, 752, 178);
+    lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(card, 0, 0);
+    lv_obj_set_style_radius(card, 12, 0);
+    lv_obj_set_style_pad_all(card, 0, 0);
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
+    make_text(card, 16, 6, 700, 22, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, "ENDPOINT");
+    make_text(card, 16, 28, 720, 40, &lv_font_montserrat_28, COL_TEXT, st.mcp_url);
+    make_text(card, 16, 74, 700, 22, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, "TOKEN");
+    make_text(card, 16, 94, 720, 34, &lv_font_montserrat_24, COL_ACCENT, st.token);
+    make_text(card, 16, 136, 56, 22, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, "mDNS");
+    make_text(card, 76, 134, 650, 24, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, st.mdns_url);
+
+    char line[128];
+    snprintf(line, sizeof(line), "浏览器打开 %s 可查看并复制完整配置", st.web_url);
+    make_text(s_mcp_screen, 24, 284, 752, 30, ui_lvgl_cjk_font(), COL_MUTED, line);
+    make_text(s_mcp_screen, 24, 320, 752, 24, &lv_font_source_han_sans_sc_16_cjk,
+              COL_MUTED, "客户端类型选 Streamable HTTP，认证头使用 Bearer Token");
+
+    lv_obj_t *back = make_button(s_mcp_screen, 24, 400, 160, 48, "返回");
+    lv_obj_add_event_cb(back, mcp_back_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *done = make_button(s_mcp_screen, 616, 400, 160, 48, "进入桌面");
+    lv_obj_set_style_bg_color(done, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_add_event_cb(done, mcp_done_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_screen_load(s_mcp_screen);
+    ui_lvgl_unlock();
+}
+
+static void mcp_open_cb(lv_event_t *e)
+{
+    (void)e;
+    open_mcp_info();
 }
 
 static void pwd_connect(void)
@@ -304,6 +403,24 @@ static void timer_cb(lv_timer_t *timer)
             lv_obj_add_flag(s_done_btn, LV_OBJ_FLAG_HIDDEN);
         }
     }
+    if (s_mcp_btn) {
+        if (connected) {
+            lv_obj_remove_flag(s_mcp_btn, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(s_mcp_btn, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    /* Show the MCP connection details once, as soon as provisioning succeeds. */
+    if (connected) {
+        if (!s_was_connected && !s_pwd_screen) {
+            ESP_LOGI(TAG, "connected, showing MCP info screen");
+            open_mcp_info();
+        }
+        s_was_connected = true;
+    } else {
+        s_was_connected = false;
+    }
 
     if (s_status) {
         if (connected) {
@@ -387,6 +504,12 @@ void provisioning_ui_show(void)
     lv_obj_add_flag(s_done_btn, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(s_done_btn, done_cb, LV_EVENT_CLICKED, NULL);
 
+    s_mcp_btn = make_button(s_screen, 492, 408, 140, 44, "MCP 配置");
+    lv_obj_add_flag(s_mcp_btn, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(s_mcp_btn, mcp_open_cb, LV_EVENT_CLICKED, NULL);
+
+    s_was_connected = false;
+
     lv_screen_load(s_screen);
     s_visible = true;
     s_was_busy = true;
@@ -412,14 +535,20 @@ void provisioning_ui_hide(void)
         s_pwd_screen = NULL;
         s_pwd_ta = NULL;
     }
+    if (s_mcp_screen) {
+        lv_obj_del_async(s_mcp_screen);
+        s_mcp_screen = NULL;
+    }
     if (s_screen) {
         lv_obj_del_async(s_screen);
         s_screen = NULL;
         s_list = NULL;
         s_status = NULL;
         s_done_btn = NULL;
+        s_mcp_btn = NULL;
     }
     s_visible = false;
+    s_was_connected = false;
     ui_lvgl_unlock();
     ui_lvgl_request_scene_refresh();
 }

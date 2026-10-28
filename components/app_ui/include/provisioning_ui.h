@@ -24,6 +24,9 @@ typedef struct {
     char ap_ssid[33];
     char ap_password[64];
     char token[33];
+    char mcp_url[96];
+    char mdns_url[96];
+    char web_url[48];
 } provisioning_status_t;
 
 typedef struct {

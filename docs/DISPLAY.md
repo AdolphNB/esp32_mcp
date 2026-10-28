@@ -127,7 +127,10 @@ idf.py -B build-43b -p /dev/ttyACM0 flash monitor
 - 首次启动无 Wi-Fi 凭证时，屏幕直接进入“连接 Wi-Fi”页面
 - 点“重新扫描”列出 2.4 GHz 网络（按 RSSI 排序）
 - 点某个 SSID → 弹出密码页 + LVGL 键盘 → 点“连接”
-- 成功后屏幕显示 SSID、IP、MCP Token，点“进入桌面”回到仪表盘
+- 连接成功后自动弹出 **MCP 配置页**：Endpoint、Bearer Token、mDNS 地址，以及
+  `http://<ip>/` 网页入口（网页里可一键复制 Hermes / OpenClaw / 通用 JSON / curl 配置）
+- MCP 配置页点“进入桌面”回到仪表盘；点“返回”回配网页
+- 配网页在已连接时多出“MCP 配置”按钮，可随时重新查看
 - 失败后停留配网页，可重新扫描/换网络
 - 点“手机配网”可临时启动 SoftAP + 网页作为备用（`APP_PROVISIONING_ALLOW_SOFTAP_FALLBACK`）
 - 点“清除配置”清除 Wi-Fi 并重启，回到配网页
@@ -413,7 +416,9 @@ PSRAM（8 MB）：
 7. **屏上配网**：
    - 首次启动应直接出现“连接 Wi-Fi”
    - 点“重新扫描”，选择 2.4 GHz SSID
-   - 输入密码并连接，成功后显示 IP + Token
+   - 输入密码并连接，成功后自动出现 MCP 配置页
+   - 核对 Endpoint (`http://<ip>:8080/mcp`)、32 位 Token、mDNS 地址
+   - 点“返回”回到配网页，点“MCP 配置”可再次查看
    - 点“进入桌面”回到仪表盘
    - 点右下角“设置”能再次打开配网页
    - 点“手机配网”能临时启动 SoftAP（备用）
