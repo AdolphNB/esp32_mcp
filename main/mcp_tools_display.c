@@ -479,6 +479,9 @@ static esp_err_t display_todo_cb(const esp_mcp_property_list_t *properties, esp_
     cJSON *list = add_widget(scene, "todo", "list", 24, 104, 752, footer && footer[0] ? 312 : 352);
     if (list) {
         cJSON_AddStringToObject(list, "title", "");
+        /* Touch: tap toggles done, long-press drag reorders. */
+        cJSON_AddBoolToObject(list, "checkable", true);
+        cJSON_AddBoolToObject(list, "reorder", true);
         cJSON *arr = cJSON_AddArrayToObject(list, "items");
         cJSON *items = items_json ? cJSON_Parse(items_json) : NULL;
         if (cJSON_IsArray(items)) {

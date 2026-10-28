@@ -302,6 +302,195 @@ static void render_calendar(lv_obj_t *parent, const cJSON *w, int x, int y, int 
     }
 }
 
+typedef struct {
+    char widget_id[32];
+    int item_index;
+    lv_obj_t *label;
+    lv_obj_t *box;
+    lv_obj_t *tick;
+    bool done;
+} ui_list_row_ctx_t;
+
+static lv_obj_t *s_drag_row;
+static lv_obj_t *s_drag_list;
+static bool s_drag_long_press;
+
+static void list_row_apply_state(ui_list_row_ctx_t *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+    if (ctx->label) {
+        lv_obj_set_style_text_decor(ctx->label,
+                                    ctx->done ? LV_TEXT_DECOR_STRIKETHROUGH : LV_TEXT_DECOR_NONE, 0);
+        lv_obj_set_style_text_color(ctx->label,
+                                    lv_color_hex(ctx->done ? COL_MUTED : COL_TEXT), 0);
+    }
+    if (ctx->box) {
+        lv_obj_set_style_bg_color(ctx->box, lv_color_hex(ctx->done ? COL_ACCENT : COL_CARD), 0);
+        lv_obj_set_style_bg_opa(ctx->box, ctx->done ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_color(ctx->box,
+                                      lv_color_hex(ctx->done ? COL_ACCENT : COL_MUTED), 0);
+    }
+    if (ctx->tick) {
+        lv_obj_set_hidden(ctx->tick, !ctx->done);
+    }
+}
+
+static void list_row_delete_cb(lv_event_t *e)
+{
+    if (s_drag_row == lv_event_get_current_target(e)) {
+        s_drag_row = NULL;
+        s_drag_list = NULL;
+    }
+    ui_list_row_ctx_t *ctx = lv_event_get_user_data(e);
+    if (ctx) {
+        lv_free(ctx);
+    }
+}
+
+static void list_drag_finish(lv_obj_t *row, lv_obj_t *list)
+{
+    if (!row) {
+        return;
+    }
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    if (!list) {
+        return;
+    }
+    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+
+    ui_list_row_ctx_t *row_ctx = lv_obj_get_user_data(row);
+    int order[UI_SERVICE_LIST_ORDER_MAX];
+    int count = 0;
+    uint32_t n = lv_obj_get_child_count(list);
+    for (uint32_t i = 0; i < n && count < UI_SERVICE_LIST_ORDER_MAX; i++) {
+        ui_list_row_ctx_t *ctx = lv_obj_get_user_data(lv_obj_get_child(list, i));
+        if (!ctx) {
+            continue;
+        }
+        order[count] = ctx->item_index;
+        ctx->item_index = count; /* JSON follows the visual order after save */
+        count++;
+    }
+    if (row_ctx && count > 1) {
+        esp_err_t err = ui_service_list_reorder_async(row_ctx->widget_id, order, count);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "reorder enqueue failed: %s", esp_err_to_name(err));
+        }
+    }
+}
+
+static void list_drag_follow(lv_event_t *e, lv_obj_t *row, lv_obj_t *list)
+{
+    lv_indev_t *indev = lv_event_get_indev(e);
+    if (!indev || !list) {
+        return;
+    }
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+
+    /* Move one slot at a time whenever the finger crosses a neighbour's center. */
+    for (int guard = 0; guard < 8; guard++) {
+        int32_t idx = lv_obj_get_index(row);
+        bool moved = false;
+        if (idx > 0) {
+            lv_area_t a;
+            lv_obj_get_coords(lv_obj_get_child(list, idx - 1), &a);
+            if (p.y < (a.y1 + a.y2) / 2) {
+                lv_obj_move_to_index(row, idx - 1);
+                moved = true;
+            }
+        }
+        if (!moved && idx + 1 < (int32_t)lv_obj_get_child_count(list)) {
+            lv_area_t a;
+            lv_obj_get_coords(lv_obj_get_child(list, idx + 1), &a);
+            if (p.y > (a.y1 + a.y2) / 2) {
+                lv_obj_move_to_index(row, idx + 1);
+                moved = true;
+            }
+        }
+        if (!moved) {
+            break;
+        }
+        lv_obj_update_layout(list);
+    }
+}
+
+static void list_row_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t *row = lv_event_get_current_target(e);
+    ui_list_row_ctx_t *ctx = lv_event_get_user_data(e);
+    if (!row || !ctx) {
+        return;
+    }
+
+    switch (code) {
+    case LV_EVENT_PRESSED:
+        s_drag_long_press = false;
+        break;
+    case LV_EVENT_LONG_PRESSED:
+        s_drag_long_press = true;
+        s_drag_row = row;
+        s_drag_list = lv_obj_get_parent(row);
+        if (s_drag_list) {
+            lv_obj_remove_flag(s_drag_list, LV_OBJ_FLAG_SCROLLABLE);
+        }
+        lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
+        lv_obj_set_style_bg_opa(row, LV_OPA_60, 0);
+        break;
+    case LV_EVENT_PRESSING:
+        if (s_drag_row == row && s_drag_list) {
+            list_drag_follow(e, row, s_drag_list);
+        }
+        break;
+    case LV_EVENT_RELEASED:
+        if (s_drag_row == row) {
+            list_drag_finish(row, s_drag_list);
+            s_drag_row = NULL;
+            s_drag_list = NULL;
+        }
+        break;
+    case LV_EVENT_PRESS_LOST:
+        if (s_drag_row == row) {
+            list_drag_finish(row, s_drag_list);
+            s_drag_row = NULL;
+            s_drag_list = NULL;
+        }
+        s_drag_long_press = false;
+        break;
+    case LV_EVENT_CLICKED:
+        if (s_drag_long_press) {
+            /* Click is also sent after a long press; do not toggle in that case. */
+            s_drag_long_press = false;
+            break;
+        }
+        if (!ctx->box) {
+            break;
+        }
+        ctx->done = !ctx->done;
+        list_row_apply_state(ctx);
+        if (ui_service_list_set_done_async(ctx->widget_id, ctx->item_index, ctx->done) != ESP_OK) {
+            ESP_LOGW(TAG, "toggle enqueue failed");
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static bool list_items_have_done(const cJSON *items)
+{
+    const cJSON *it = NULL;
+    cJSON_ArrayForEach(it, items) {
+        if (cJSON_IsObject(it) && cJSON_GetObjectItemCaseSensitive(it, "done")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, int hh)
 {
     lv_obj_t *card = make_card(parent, x, y, ww, hh);
@@ -310,6 +499,16 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
     }
     int cw = ww - 24;
     int ch = hh - 24;
+    const char *widget_id = jstr(w, "id", "");
+    const cJSON *items = cJSON_GetObjectItemCaseSensitive(w, "items");
+    /* Lists that carry a done field are checklists by default, so scenes
+     * rendered before the touch UI was introduced stay interactive. */
+    const cJSON *checkable_item = cJSON_GetObjectItemCaseSensitive(w, "checkable");
+    bool checkable = cJSON_IsBool(checkable_item) ? cJSON_IsTrue(checkable_item)
+                                                  : list_items_have_done(items);
+    const cJSON *reorder_item = cJSON_GetObjectItemCaseSensitive(w, "reorder");
+    bool reorder = cJSON_IsBool(reorder_item) ? cJSON_IsTrue(reorder_item) : checkable;
+    bool interactive = (checkable || reorder) && widget_id[0];
     const char *title = jstr(w, "title", "");
     int top = 0;
     if (title[0]) {
@@ -317,9 +516,10 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
                    ui_lvgl_cjk_font(), COL_ACCENT, LV_TEXT_ALIGN_LEFT);
         top = 38;
     }
+    int hint_h = interactive ? 24 : 0;
     lv_obj_t *list = lv_obj_create(card);
     lv_obj_set_pos(list, 0, top);
-    lv_obj_set_size(list, cw, ch - top);
+    lv_obj_set_size(list, cw, ch - top - hint_h);
     lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(list, 0, 0);
     lv_obj_set_style_pad_all(list, 0, 0);
@@ -327,10 +527,20 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_scroll_dir(list, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
+    if (interactive) {
+        lv_obj_t *hint = make_label(card, 0, ch - hint_h + 2, cw, 22,
+                                    "点按勾选，长按拖动排序",
+                                    &lv_font_source_han_sans_sc_16_cjk, COL_MUTED,
+                                    LV_TEXT_ALIGN_LEFT);
+        if (hint) {
+            lv_obj_set_clickable(hint, false);
+        }
+    }
 
-    const cJSON *items = cJSON_GetObjectItemCaseSensitive(w, "items");
     const cJSON *it = NULL;
+    int item_index = -1;
     cJSON_ArrayForEach(it, items) {
+        item_index++;
         const char *text = jstr(it, "text", "");
         if (!text[0]) {
             continue;
@@ -344,8 +554,22 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
         lv_obj_set_height(row, 44);
         lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(row, 0, 0);
+        lv_obj_set_style_radius(row, 8, 0);
         lv_obj_set_style_pad_all(row, 0, 0);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+        ui_list_row_ctx_t *ctx = NULL;
+        if (interactive) {
+            ctx = lv_malloc_zeroed(sizeof(*ctx));
+            if (ctx) {
+                snprintf(ctx->widget_id, sizeof(ctx->widget_id), "%s", widget_id);
+                ctx->item_index = item_index;
+                ctx->done = done;
+                lv_obj_set_user_data(row, ctx);
+                lv_obj_add_event_cb(row, list_row_delete_cb, LV_EVENT_DELETE, ctx);
+                lv_obj_add_event_cb(row, list_row_event_cb, LV_EVENT_ALL, ctx);
+            }
+        }
 
         lv_obj_t *bar = lv_obj_create(row);
         lv_obj_set_pos(bar, 0, 8);
@@ -354,17 +578,50 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
         lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(bar, 0, 0);
         lv_obj_set_style_radius(bar, 2, 0);
+        lv_obj_set_clickable(bar, false);
 
-        int text_w = due[0] ? cw - 96 : cw - 20;
-        lv_obj_t *label = make_label(row, 14, 4, text_w, 36, text,
+        int text_x = 14;
+        if (ctx) {
+            lv_obj_t *box = lv_obj_create(row);
+            lv_obj_set_pos(box, 14, 10);
+            lv_obj_set_size(box, 24, 24);
+            lv_obj_set_style_bg_color(box, lv_color_hex(COL_CARD), 0);
+            lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(box, 2, 0);
+            lv_obj_set_style_border_color(box, lv_color_hex(COL_MUTED), 0);
+            lv_obj_set_style_radius(box, 6, 0);
+            lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_clickable(box, false);
+
+            lv_obj_t *tick = lv_label_create(box);
+            lv_label_set_text(tick, LV_SYMBOL_OK);
+            lv_obj_set_style_text_font(tick, &lv_font_source_han_sans_sc_16_cjk, 0);
+            lv_obj_set_style_text_color(tick, lv_color_white(), 0);
+            lv_obj_center(tick);
+            lv_obj_set_clickable(tick, false);
+
+            ctx->box = box;
+            ctx->tick = tick;
+            text_x = 46;
+        }
+
+        int text_w = (due[0] ? cw - 96 : cw - 20) - (text_x - 14);
+        lv_obj_t *label = make_label(row, text_x, 4, text_w, 36, text,
                                      ui_lvgl_cjk_font(),
                                      done ? COL_MUTED : COL_TEXT, LV_TEXT_ALIGN_LEFT);
-        if (done) {
-            lv_obj_set_style_text_decor(label, LV_TEXT_DECOR_STRIKETHROUGH, 0);
+        if (label) {
+            lv_obj_set_clickable(label, false);
         }
         if (due[0]) {
-            make_label(row, cw - 82, 4, 82, 36, due,
-                       ui_lvgl_cjk_font(), COL_MUTED, LV_TEXT_ALIGN_RIGHT);
+            lv_obj_t *due_label = make_label(row, cw - 82, 4, 82, 36, due,
+                                             ui_lvgl_cjk_font(), COL_MUTED, LV_TEXT_ALIGN_RIGHT);
+            if (due_label) {
+                lv_obj_set_clickable(due_label, false);
+            }
+        }
+        if (ctx) {
+            ctx->label = label;
+            list_row_apply_state(ctx);
         }
     }
     if (!items || cJSON_GetArraySize(items) == 0) {

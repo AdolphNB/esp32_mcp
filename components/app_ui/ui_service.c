@@ -9,7 +9,9 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
@@ -22,15 +24,34 @@ static const char *TAG = "ui_service";
 
 #define UI_NVS_NAMESPACE "ui"
 #define UI_DIR "/spiffs/ui"
+#define UI_LIST_ACTION_QUEUE_LEN 8
+#define UI_LIST_ACTION_TASK_STACK 8192
 
 typedef struct {
     char *json;
     size_t len;
 } ui_page_t;
 
+typedef enum {
+    UI_LIST_ACTION_SET_DONE = 0,
+    UI_LIST_ACTION_REORDER = 1,
+} ui_list_action_op_t;
+
+typedef struct {
+    uint8_t op;
+    char widget_id[32];
+    int index;
+    bool done;
+    int count;
+    int order[UI_SERVICE_LIST_ORDER_MAX];
+} ui_list_action_t;
+
 static ui_page_t s_pages[CONFIG_APP_DISPLAY_MAX_PAGES];
 static SemaphoreHandle_t s_lock;
 static StaticSemaphore_t s_lock_buf;
+static QueueHandle_t s_list_queue;
+static StaticQueue_t s_list_queue_buf;
+static uint8_t s_list_queue_storage[UI_LIST_ACTION_QUEUE_LEN * sizeof(ui_list_action_t)];
 static nvs_handle_t s_nvs;
 static bool s_nvs_ready;
 static bool s_fs_ready;
@@ -185,6 +206,174 @@ static esp_err_t apply_current_locked(void)
     return err;
 }
 
+static cJSON *find_widget_by_id(cJSON *root, const char *widget_id)
+{
+    if (!root || !widget_id || !widget_id[0]) {
+        return NULL;
+    }
+    cJSON *widgets = cJSON_GetObjectItemCaseSensitive(root, "widgets");
+    if (!cJSON_IsArray(widgets)) {
+        return NULL;
+    }
+    cJSON *w = NULL;
+    cJSON_ArrayForEach(w, widgets) {
+        const cJSON *id = cJSON_GetObjectItemCaseSensitive(w, "id");
+        const cJSON *type = cJSON_GetObjectItemCaseSensitive(w, "type");
+        if (cJSON_IsString(id) && id->valuestring &&
+                cJSON_IsString(type) && type->valuestring &&
+                strcmp(id->valuestring, widget_id) == 0 &&
+                strcmp(type->valuestring, "list") == 0) {
+            return w;
+        }
+    }
+    return NULL;
+}
+
+/* Replace the in-memory + SPIFFS copy of the current page without re-rendering:
+ * the LVGL widget was already updated by the touch event. */
+static esp_err_t commit_touched_scene_locked(cJSON *root)
+{
+    char *json = cJSON_PrintUnformatted(root);
+    if (!json) {
+        return ESP_ERR_NO_MEM;
+    }
+    esp_err_t err = store_scene_locked(s_current, json, strlen(json), "touch update");
+    cJSON_free(json);
+    return err;
+}
+
+static esp_err_t list_set_done_locked(const char *widget_id, int item_index, bool done)
+{
+    if (item_index < 0 || !s_pages[s_current].json) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    cJSON *root = cJSON_Parse(s_pages[s_current].json);
+    if (!root) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_err_t err = ESP_ERR_NOT_FOUND;
+    cJSON *w = find_widget_by_id(root, widget_id);
+    cJSON *items = w ? cJSON_GetObjectItemCaseSensitive(w, "items") : NULL;
+    cJSON *it = cJSON_IsArray(items) ? cJSON_GetArrayItem(items, item_index) : NULL;
+    if (cJSON_IsObject(it)) {
+        cJSON *old = cJSON_GetObjectItemCaseSensitive(it, "done");
+        if (old) {
+            cJSON_DeleteItemFromObjectCaseSensitive(it, "done");
+        }
+        cJSON_AddBoolToObject(it, "done", done);
+        err = commit_touched_scene_locked(root);
+    }
+    cJSON_Delete(root);
+    return err;
+}
+
+static esp_err_t list_reorder_locked(const char *widget_id, const int *order, int count)
+{
+    if (!order || count <= 0 || count > UI_SERVICE_LIST_ORDER_MAX) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_pages[s_current].json) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    cJSON *root = cJSON_Parse(s_pages[s_current].json);
+    if (!root) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_err_t err = ESP_ERR_NOT_FOUND;
+    cJSON *w = find_widget_by_id(root, widget_id);
+    cJSON *items = w ? cJSON_GetObjectItemCaseSensitive(w, "items") : NULL;
+    int n = cJSON_IsArray(items) ? cJSON_GetArraySize(items) : 0;
+    if (n > 0 && n <= 32 && count <= n) {
+        cJSON *next = cJSON_CreateArray();
+        uint32_t used = 0;
+        if (!next) {
+            cJSON_Delete(root);
+            return ESP_ERR_NO_MEM;
+        }
+        bool ok = true;
+        for (int pass = 0; pass < 2 && ok; pass++) {
+            for (int i = 0; i < (pass == 0 ? count : n); i++) {
+                int idx = pass == 0 ? order[i] : i;
+                if (idx < 0 || idx >= n || (used & (1u << idx))) {
+                    continue;
+                }
+                cJSON *dup = cJSON_Duplicate(cJSON_GetArrayItem(items, idx), 1);
+                if (!dup) {
+                    ok = false;
+                    break;
+                }
+                cJSON_AddItemToArray(next, dup);
+                used |= 1u << idx;
+            }
+        }
+        if (ok && cJSON_GetArraySize(next) == n) {
+            cJSON_ReplaceItemInObjectCaseSensitive(w, "items", next);
+            err = commit_touched_scene_locked(root);
+        } else {
+            cJSON_Delete(next);
+        }
+    }
+    cJSON_Delete(root);
+    return err;
+}
+
+static void ui_list_action_task(void *arg)
+{
+    (void)arg;
+    ui_list_action_t act;
+    while (xQueueReceive(s_list_queue, &act, portMAX_DELAY) == pdTRUE) {
+        if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(3000)) != pdTRUE) {
+            ESP_LOGW(TAG, "touch action: ui lock timeout");
+            continue;
+        }
+        esp_err_t err = (act.op == UI_LIST_ACTION_SET_DONE)
+                        ? list_set_done_locked(act.widget_id, act.index, act.done)
+                        : list_reorder_locked(act.widget_id, act.order, act.count);
+        xSemaphoreGive(s_lock);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "touch action %u on '%s' failed: %s", act.op, act.widget_id,
+                     esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "touch action %u saved on '%s'", act.op, act.widget_id);
+        }
+    }
+}
+
+static esp_err_t enqueue_list_action(const ui_list_action_t *act)
+{
+    if (!s_list_queue || !act) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return xQueueSend(s_list_queue, act, 0) == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
+esp_err_t ui_service_list_set_done_async(const char *widget_id, int item_index, bool done)
+{
+    if (!widget_id || !widget_id[0] || item_index < 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    ui_list_action_t act = {0};
+    act.op = UI_LIST_ACTION_SET_DONE;
+    snprintf(act.widget_id, sizeof(act.widget_id), "%s", widget_id);
+    act.index = item_index;
+    act.done = done;
+    return enqueue_list_action(&act);
+}
+
+esp_err_t ui_service_list_reorder_async(const char *widget_id, const int *order, int count)
+{
+    if (!widget_id || !widget_id[0] || !order || count <= 0 ||
+            count > UI_SERVICE_LIST_ORDER_MAX) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    ui_list_action_t act = {0};
+    act.op = UI_LIST_ACTION_REORDER;
+    snprintf(act.widget_id, sizeof(act.widget_id), "%s", widget_id);
+    act.count = count;
+    memcpy(act.order, order, (size_t)count * sizeof(int));
+    return enqueue_list_action(&act);
+}
+
 esp_err_t ui_service_init(void)
 {
     ESP_LOGI(TAG, "init begin");
@@ -198,6 +387,15 @@ esp_err_t ui_service_init(void)
     s_current = 0;
     s_last_error[0] = '\0';
     ESP_LOGI(TAG, "mutex ok");
+
+    s_list_queue = xQueueCreateStatic(UI_LIST_ACTION_QUEUE_LEN, sizeof(ui_list_action_t),
+                                      s_list_queue_storage, &s_list_queue_buf);
+    if (!s_list_queue ||
+            xTaskCreate(ui_list_action_task, "ui_actions", UI_LIST_ACTION_TASK_STACK,
+                        NULL, 3, NULL) != pdPASS) {
+        ESP_LOGW(TAG, "touch action worker unavailable, UI edits will not persist");
+        s_list_queue = NULL;
+    }
 
     esp_err_t err = nvs_flash_init();
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {

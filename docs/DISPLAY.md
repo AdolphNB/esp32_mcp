@@ -188,6 +188,32 @@ CONFIG_APP_WIFI_SCAN_MAX=16
 
 `text`、`big_text`、`clock`、`calendar`、`list`、`quote`、`horoscope`、`image`、`qr`、`divider`、`progress`。
 
+#### list 触摸交互（待办）
+
+`list` 支持两个可选布尔字段：
+
+```json
+{
+  "id": "todo",
+  "type": "list",
+  "x": 24, "y": 104, "w": 752, "h": 352,
+  "checkable": true,
+  "reorder": true,
+  "items": [
+    {"text": "项目评审", "prio": "high", "done": false, "due": "10:30"},
+    {"text": "买电池", "prio": "low", "done": true}
+  ]
+}
+```
+
+- `checkable`：每行左侧显示勾选框；**点按整行**切换 `done`，完成项文字变灰并加删除线
+- `reorder`：**长按约 0.4 秒后上下拖动**调整顺序，松手保存
+- 触摸修改直接写回当前页的 scene JSON（`/spiffs/ui/pageN.json`），重启/切页后保持
+- 修改只更新 `done` 和顺序，不重新渲染整页；写盘由独立 worker 完成，不会卡住 LVGL
+- `display_todo` 模板默认开启 `checkable` 和 `reorder`，并在卡片底部显示操作提示
+
+> AI 再次调用 `display_todo` 会用新数据覆盖整页，包括屏上改过的勾选和顺序。需要保留时请让 AI 只更新未完成项，或改用 `display_patch`。
+
 ### 4.3 字体
 
 - `data/fonts/ui24.bin`：GB2312 一级字库 + ASCII + 标点，24px，约 948 KB
@@ -225,7 +251,7 @@ FONT=/path/to/NotoSansCJKsc-Regular.otf ./tools/gen_fonts.sh
 | `display_notify` | 3 秒悬浮提示 |
 | `display_brightness` | 0–100；0 关闭背光 |
 | `display_calendar` | 日历模板，AI 只填数据 |
-| `display_todo` | 待办模板，`items` 支持 `prio/done/due` |
+| `display_todo` | 待办模板，`items` 支持 `prio/done/due`；屏上可点按勾选、长按拖动排序 |
 | `display_quote` | 大字格言，`size` 32/48/64 |
 | `display_horoscope` | 星座运势卡片 |
 | `display_image` | 允许前缀内的 LAN 图片（后端待实现） |
