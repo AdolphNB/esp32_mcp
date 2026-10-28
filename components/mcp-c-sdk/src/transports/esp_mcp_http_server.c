@@ -341,11 +341,45 @@ static esp_err_t esp_mcp_http_apply_protocol_version(httpd_req_t *req,
         if (httpd_req_get_hdr_value_str(req, "MCP-Protocol-Version", buf, sizeof(buf)) != ESP_OK) {
             ESP_LOGW(TAG, "Failed to read MCP-Protocol-Version header, using default");
         } else {
-            if (!esp_mcp_http_is_ascii_visible(buf) || !esp_mcp_http_is_supported_proto(buf)) {
+            char raw_value[32];
+            strlcpy(raw_value, buf, sizeof(raw_value));
+            /* Some clients send the version with surrounding whitespace, inside
+             * quotes, or as a comma/semicolon separated preference list (e.g.
+             * "2025-11-25, 2025-06-18"). Accept those instead of rejecting the
+             * whole request; pick the first version this server supports. */
+            char *value = buf;
+            while (*value == ' ' || *value == '\t') {
+                value++;
+            }
+            size_t value_len = strlen(value);
+            while (value_len > 0 && (value[value_len - 1] == ' ' || value[value_len - 1] == '\t')) {
+                value[--value_len] = '\0';
+            }
+            if (value_len >= 2 && value[0] == '"' && value[value_len - 1] == '"') {
+                value[value_len - 1] = '\0';
+                value++;
+            }
+
+            bool supported = esp_mcp_http_is_ascii_visible(value) &&
+                             esp_mcp_http_is_supported_proto(value);
+            if (!supported) {
+                char *saveptr = NULL;
+                for (char *tok = strtok_r(value, " ,;", &saveptr);
+                        tok != NULL;
+                        tok = strtok_r(NULL, " ,;", &saveptr)) {
+                    if (esp_mcp_http_is_ascii_visible(tok) && esp_mcp_http_is_supported_proto(tok)) {
+                        value = tok;
+                        supported = true;
+                        break;
+                    }
+                }
+            }
+            if (!supported) {
+                ESP_LOGW(TAG, "Unsupported MCP-Protocol-Version header: '%s'", raw_value);
                 httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unsupported MCP-Protocol-Version");
                 return ESP_ERR_INVALID_ARG;
             }
-            proto_to_use = buf;
+            proto_to_use = value;
         }
     } else if (mcp_http) {
         char session_id[SESSION_ID_LEN] = {0};
@@ -1612,6 +1646,7 @@ static esp_err_t esp_mcp_http_check_authorization(httpd_req_t *req,
 #else
     size_t vlen = httpd_req_get_hdr_value_len(req, "Authorization");
     if (vlen == 0) {
+        ESP_LOGW(TAG, "MCP auth: request has no Authorization header");
         char www_auth[384] = {0};
         esp_mcp_http_build_www_authenticate(req, NULL, www_auth, sizeof(www_auth));
         return esp_mcp_http_send_jsonrpc_error(req,
@@ -1692,6 +1727,7 @@ static esp_err_t esp_mcp_http_check_authorization(httpd_req_t *req,
     }
     free(value);
     if (!ok) {
+        ESP_LOGW(TAG, "MCP auth: Bearer token rejected (scheme or token mismatch)");
         char www_auth[384] = {0};
         esp_mcp_http_build_www_authenticate(req, "invalid_token", www_auth, sizeof(www_auth));
         const char *public_reason = "invalid_token";

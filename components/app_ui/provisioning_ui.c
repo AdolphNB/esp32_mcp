@@ -154,6 +154,8 @@ static void open_mcp_info(void)
     make_text(s_mcp_screen, 24, 284, 752, 30, ui_lvgl_cjk_font(), COL_MUTED, line);
     make_text(s_mcp_screen, 24, 320, 752, 24, &lv_font_source_han_sans_sc_16_cjk,
               COL_MUTED, "客户端类型选 Streamable HTTP，认证头使用 Bearer Token");
+    make_text(s_mcp_screen, 24, 348, 752, 24, &lv_font_source_han_sans_sc_16_cjk,
+              COL_MUTED, "请求头填 Authorization: Bearer 加屏幕上的 Token");
 
     lv_obj_t *back = make_button(s_mcp_screen, 24, 400, 160, 48, "返回");
     lv_obj_add_event_cb(back, mcp_back_cb, LV_EVENT_CLICKED, NULL);
