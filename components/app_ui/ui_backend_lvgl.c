@@ -67,6 +67,7 @@ const lv_font_t *ui_lvgl_cjk_font(void)
 
 static void load_fonts(void)
 {
+    ESP_LOGI(TAG, "loading font /spiffs/fonts/ui24.bin");
     FILE *f = fopen("/spiffs/fonts/ui24.bin", "rb");
     if (!f) {
         ESP_LOGW(TAG, "font /spiffs/fonts/ui24.bin not found, using built-in CJK 16");
@@ -98,6 +99,7 @@ static void load_fonts(void)
         s_cjk24_buf = NULL;
         return;
     }
+    ESP_LOGI(TAG, "font read %ld bytes, parsing", size);
     s_cjk24 = lv_binfont_create_from_buffer(s_cjk24_buf, (uint32_t)size);
     if (!s_cjk24) {
         ESP_LOGW(TAG, "binfont parse failed");

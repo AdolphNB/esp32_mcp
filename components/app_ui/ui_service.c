@@ -186,6 +186,7 @@ static esp_err_t apply_current_locked(void)
 
 esp_err_t ui_service_init(void)
 {
+    ESP_LOGI(TAG, "init begin");
     if (s_lock) {
         return ESP_OK;
     }
@@ -195,6 +196,7 @@ esp_err_t ui_service_init(void)
     }
     s_current = 0;
     s_last_error[0] = '\0';
+    ESP_LOGI(TAG, "mutex ok");
 
     esp_err_t err = nvs_flash_init();
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
@@ -204,6 +206,7 @@ esp_err_t ui_service_init(void)
         s_nvs_ready = true;
     }
     nvs_load();
+    ESP_LOGI(TAG, "nvs ok, page=%d brightness=%d", s_current, s_brightness);
 
     esp_vfs_spiffs_conf_t conf = {
         .base_path = "/spiffs",
@@ -267,7 +270,9 @@ esp_err_t ui_service_init(void)
 
     const ui_backend_t *backend = ui_backend_get();
     if (backend && backend->init) {
+        ESP_LOGI(TAG, "backend init begin");
         esp_err_t berr = backend->init();
+        ESP_LOGI(TAG, "backend init done: %s", esp_err_to_name(berr));
         if (berr != ESP_OK) {
             ESP_LOGE(TAG, "backend init failed: %s", esp_err_to_name(berr));
             set_last_error("display backend init failed");
