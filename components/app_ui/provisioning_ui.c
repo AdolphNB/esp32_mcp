@@ -337,8 +337,10 @@ void provisioning_ui_show(void)
         return;
     }
     if (!ui_lvgl_lock(2000)) {
+        ESP_LOGW(TAG, "show: LVGL lock timeout");
         return;
     }
+    ESP_LOGI(TAG, "showing provisioning screen");
 
     s_screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s_screen, lv_color_hex(COL_BG), 0);

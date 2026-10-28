@@ -145,14 +145,20 @@ static void monitor_task(void *arg)
 {
     (void)arg;
     bool shown = false;
+    wifi_mgr_state_t last = WIFI_MGR_STATE_BOOT;
     while (true) {
         wifi_mgr_state_t st = wifi_manager_get_state();
         bool visible = provisioning_ui_is_visible();
 
+        if (st != last) {
+            ESP_LOGI(TAG, "wifi state -> %s (ui_visible=%d)", wifi_manager_state_str(), visible);
+            last = st;
+        }
         if (!visible) {
             shown = false;
         }
         if (!shown && (st == WIFI_MGR_STATE_PROVISIONING || st == WIFI_MGR_STATE_ERROR)) {
+            ESP_LOGI(TAG, "opening provisioning UI");
             provisioning_ui_show();
             shown = true;
         }

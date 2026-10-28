@@ -243,9 +243,17 @@ esp_err_t ui_service_init(void)
     if (!s_pages[0].json) {
         char *home = NULL;
         if (ui_scene_default_home(&home) == ESP_OK && home) {
-            store_scene_locked(0, home, strlen(home), "default home");
+            esp_err_t herr = store_scene_locked(0, home, strlen(home), "default home");
+            if (herr != ESP_OK) {
+                ESP_LOGE(TAG, "default home scene rejected: %s", s_last_error);
+            }
             ui_scene_free(home);
+        } else {
+            ESP_LOGE(TAG, "failed to build default home scene");
         }
+    }
+    if (!s_pages[0].json) {
+        ESP_LOGE(TAG, "no scene on page 0 after init");
     }
 
     if (!s_pages[s_current].json) {
@@ -267,8 +275,14 @@ esp_err_t ui_service_init(void)
         }
     }
 
-    if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        apply_current_locked();
+    if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(3000)) == pdTRUE) {
+        esp_err_t aerr = apply_current_locked();
+        if (aerr != ESP_OK) {
+            ESP_LOGE(TAG, "apply current scene failed: %s", esp_err_to_name(aerr));
+        } else {
+            ESP_LOGI(TAG, "current scene applied: page=%d bytes=%u", s_current,
+                     (unsigned)s_pages[s_current].len);
+        }
         if (backend && backend->set_brightness) {
             backend->set_brightness(s_brightness);
         }
@@ -276,6 +290,8 @@ esp_err_t ui_service_init(void)
             backend->set_backlight(s_backlight);
         }
         xSemaphoreGive(s_lock);
+    } else {
+        ESP_LOGE(TAG, "ui lock timeout during init");
     }
 
     s_ready = true;

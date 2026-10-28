@@ -34,6 +34,7 @@ static const char *TAG = "ui_lvgl";
 
 static lv_display_t *s_disp;
 static lv_obj_t *s_scene_screen;
+static lv_obj_t *s_boot_screen;
 static lv_obj_t *s_dim_overlay;
 static lv_timer_t *s_clock_timer;
 static lv_obj_t *s_clock_label;
@@ -660,6 +661,20 @@ static esp_err_t lcd_init(void)
     };
     lvgl_port_add_touch(&touch_port_cfg);
 
+    if (ui_lvgl_lock(2000)) {
+        s_boot_screen = lv_obj_create(NULL);
+        lv_obj_set_style_bg_color(s_boot_screen, lv_color_hex(0x1F6FEB), 0);
+        lv_obj_set_style_bg_opa(s_boot_screen, LV_OPA_COVER, 0);
+        lv_obj_t *label = lv_label_create(s_boot_screen);
+        lv_label_set_text(label, "LVGL OK\n800x480");
+        lv_obj_set_style_text_color(label, lv_color_white(), 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
+        lv_obj_center(label);
+        lv_screen_load(s_boot_screen);
+        ui_lvgl_unlock();
+        ESP_LOGI(TAG, "boot screen shown");
+    }
+
     ESP_LOGI(TAG, "RGB+LVGL ready: %dx%d, heap internal=%u KB psram=%u KB",
              b->width, b->height,
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
@@ -717,6 +732,10 @@ static esp_err_t lvgl_apply_scene(int page, const char *scene_json)
         s_clock_timer = NULL;
     }
     s_clock_label = NULL;
+    if (s_boot_screen) {
+        lv_obj_del(s_boot_screen);
+        s_boot_screen = NULL;
+    }
     if (s_scene_screen) {
         lv_obj_del(s_scene_screen);
         s_scene_screen = NULL;
@@ -727,6 +746,7 @@ static esp_err_t lvgl_apply_scene(int page, const char *scene_json)
     lv_obj_set_style_bg_opa(s_scene_screen, LV_OPA_COVER, 0);
     lv_obj_remove_flag(s_scene_screen, LV_OBJ_FLAG_SCROLLABLE);
 
+    int widget_count = 0;
     cJSON *root = cJSON_Parse(scene_json);
     if (!root) {
         make_label(s_scene_screen, 20, 20, 760, 60, "场景 JSON 解析失败",
@@ -734,22 +754,29 @@ static esp_err_t lvgl_apply_scene(int page, const char *scene_json)
     } else {
         const cJSON *widgets = cJSON_GetObjectItemCaseSensitive(root, "widgets");
         const cJSON *w = NULL;
+        if (cJSON_IsArray(widgets)) {
+            widget_count = cJSON_GetArraySize(widgets);
+        }
         cJSON_ArrayForEach(w, widgets) {
             if (cJSON_IsObject(w)) {
                 render_widget(s_scene_screen, w);
             }
         }
         cJSON_Delete(root);
+        root = NULL;
     }
 
     const board_desc_t *b = board_get();
     add_settings_button(s_scene_screen, b ? b->width : 800, b ? b->height : 480);
-
-    if (!provisioning_ui_is_visible()) {
+    bool provisioning = provisioning_ui_is_visible();
+    if (!provisioning) {
         lv_screen_load(s_scene_screen);
     }
     dim_update();
     ui_lvgl_unlock();
+    ESP_LOGI(TAG, "scene applied: page=%d bytes=%u widgets=%d provisioning=%d loaded=%d",
+             page, (unsigned)strlen(scene_json), widget_count, provisioning ? 1 : 0,
+             provisioning ? 0 : 1);
     return ESP_OK;
 }
 
