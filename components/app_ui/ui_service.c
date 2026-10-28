@@ -36,6 +36,7 @@ static bool s_fs_ready;
 static int s_current;
 static int s_brightness;
 static bool s_backlight;
+static bool s_ready;
 static char s_last_error[128];
 
 static void set_last_error(const char *msg)
@@ -260,7 +261,9 @@ esp_err_t ui_service_init(void)
     if (backend && backend->init) {
         esp_err_t berr = backend->init();
         if (berr != ESP_OK) {
-            ESP_LOGW(TAG, "backend init failed: %s", esp_err_to_name(berr));
+            ESP_LOGE(TAG, "backend init failed: %s", esp_err_to_name(berr));
+            set_last_error("display backend init failed");
+            return berr;
         }
     }
 
@@ -275,6 +278,7 @@ esp_err_t ui_service_init(void)
         xSemaphoreGive(s_lock);
     }
 
+    s_ready = true;
     ESP_LOGI(TAG, "ready, page=%d brightness=%d fs=%s backend=%s",
              s_current, s_brightness, s_fs_ready ? "yes" : "no",
              backend ? backend->name : "none");
@@ -415,6 +419,24 @@ esp_err_t ui_service_set_backlight(bool on)
         return backend->set_backlight(on);
     }
     return ESP_ERR_NOT_SUPPORTED;
+}
+
+esp_err_t ui_service_refresh(void)
+{
+    if (!s_lock) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(2000)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+    esp_err_t err = apply_current_locked();
+    xSemaphoreGive(s_lock);
+    return err;
+}
+
+bool ui_service_is_ready(void)
+{
+    return s_ready;
 }
 
 int ui_service_current_page(void)

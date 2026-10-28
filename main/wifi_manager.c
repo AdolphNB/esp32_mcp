@@ -1,6 +1,7 @@
 #include "wifi_manager.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app_config.h"
@@ -36,6 +37,11 @@ static char s_last_error[32];
 static esp_timer_handle_t s_reconnect_timer;
 static esp_timer_handle_t s_ap_stop_timer;
 static bool s_have_credentials;
+#if CONFIG_APP_PROVISIONING_SCREEN
+static bool s_screen_provisioning = true;
+#else
+static bool s_screen_provisioning = false;
+#endif
 
 static void reconnect_timer_cb(void *arg)
 {
@@ -174,9 +180,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                     s_state = WIFI_MGR_STATE_CONNECTING;
                     schedule_reconnect(delay);
                 } else {
-                    ESP_LOGW(TAG, "too many failures, enabling provisioning AP");
                     s_state = WIFI_MGR_STATE_ERROR;
-                    wifi_manager_start_ap();
+                    if (s_screen_provisioning) {
+                        ESP_LOGW(TAG, "too many failures, waiting for on-screen provisioning");
+                    } else {
+                        ESP_LOGW(TAG, "too many failures, enabling provisioning AP");
+                        wifi_manager_start_ap();
+                    }
                     schedule_reconnect(30000);
                 }
             }
@@ -314,6 +324,11 @@ esp_err_t wifi_manager_start(void)
         return ESP_OK;
     }
 
+    if (s_screen_provisioning) {
+        s_state = WIFI_MGR_STATE_PROVISIONING;
+        ESP_LOGI(TAG, "no Wi-Fi credentials, waiting for on-screen provisioning");
+        return ESP_OK;
+    }
     ESP_LOGI(TAG, "no Wi-Fi credentials, starting provisioning AP");
     return wifi_manager_start_ap();
 }
@@ -420,4 +435,64 @@ const char *wifi_manager_get_error(void)
 const uint8_t *wifi_manager_get_bssid(void)
 {
     return s_bssid;
+}
+
+bool wifi_manager_has_credentials(void)
+{
+    return s_have_credentials;
+}
+
+void wifi_manager_set_screen_provisioning(bool enabled)
+{
+    s_screen_provisioning = enabled;
+}
+
+static int scan_record_cmp(const void *a, const void *b)
+{
+    const wifi_ap_record_t *ra = (const wifi_ap_record_t *)a;
+    const wifi_ap_record_t *rb = (const wifi_ap_record_t *)b;
+    return rb->rssi - ra->rssi;
+}
+
+esp_err_t wifi_manager_scan(wifi_scan_item_t *out, int max, int *count)
+{
+    if (!out || max <= 0 || !count) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *count = 0;
+
+    wifi_scan_config_t cfg = {
+        .ssid = NULL,
+        .bssid = NULL,
+        .channel = 0,
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+    };
+    esp_err_t err = esp_wifi_scan_start(&cfg, true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "scan start failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    wifi_ap_record_t *records = calloc((size_t)max, sizeof(*records));
+    if (!records) {
+        return ESP_ERR_NO_MEM;
+    }
+    uint16_t num = (uint16_t)max;
+    err = esp_wifi_scan_get_ap_records(&num, records);
+    if (err == ESP_OK) {
+        qsort(records, num, sizeof(*records), scan_record_cmp);
+        int n = num < max ? num : max;
+        for (int i = 0; i < n; i++) {
+            snprintf(out[i].ssid, sizeof(out[i].ssid), "%s", (char *)records[i].ssid);
+            out[i].rssi = records[i].rssi;
+            out[i].auth = records[i].authmode;
+            out[i].channel = records[i].primary;
+        }
+        *count = n;
+    } else {
+        ESP_LOGW(TAG, "scan get records failed: %s", esp_err_to_name(err));
+    }
+    free(records);
+    return err;
 }

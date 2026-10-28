@@ -5,13 +5,21 @@ idf_component_register(
         "ui_backend.c"
         "ui_backend_mock.c"
         "ui_backend_lvgl.c"
+        "provisioning_ui.c"
     INCLUDE_DIRS "include"
     REQUIRES
         app_board
         cjson
         esp_common
+        esp_driver_gpio
+        esp_driver_i2c
+        esp_lcd
+        esp_lcd_touch_gt911
+        esp_lvgl_port
         freertos
+        heap
         log
+        lvgl
         nvs_flash
         spiffs
 )

@@ -19,6 +19,7 @@
 #include "mdns_service.h"
 #include "nvs_store.h"
 #include "ota.h"
+#include "provisioning_backend.h"
 #include "rate_limit.h"
 #if CONFIG_APP_ENABLE_DISPLAY
 #include "ui_service.h"
@@ -112,7 +113,14 @@ void app_main(void)
 
 #if CONFIG_APP_ENABLE_DISPLAY
     ESP_ERROR_CHECK(clock_service_init());
-    ESP_ERROR_CHECK(ui_service_init());
+    esp_err_t ui_err = ui_service_init();
+    if (ui_err == ESP_OK) {
+        ESP_ERROR_CHECK(provisioning_backend_init());
+    } else {
+        ESP_LOGE(TAG, "display UI init failed: %s; falling back to SoftAP provisioning",
+                 esp_err_to_name(ui_err));
+        wifi_manager_set_screen_provisioning(false);
+    }
 #endif
 
     ESP_ERROR_CHECK(gpio_guard_init());
@@ -132,6 +140,7 @@ void app_main(void)
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(captive_portal_start());
     ESP_ERROR_CHECK(wifi_manager_start());
+    provisioning_backend_start_task();
 
     xTaskCreate(network_task, "network_task", 8192, NULL, 4, NULL);
 #if !CONFIG_APP_BOARD_WAVESHARE_43B

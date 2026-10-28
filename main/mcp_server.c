@@ -7,6 +7,9 @@
 #include "esp_mcp_mgr.h"
 #include "mcp_tools.h"
 #include "nvs_store.h"
+#if CONFIG_APP_ENABLE_DISPLAY
+#include "ui_service.h"
+#endif
 
 static const char *TAG = "mcp_server";
 
@@ -60,8 +63,10 @@ esp_err_t mcp_server_init(void)
     mcp_register_gpio_tools(s_mcp);
     mcp_register_ota_tools(s_mcp);
 #if CONFIG_APP_ENABLE_DISPLAY
-    mcp_register_display_tools(s_mcp);
-    mcp_register_io_tools(s_mcp);
+    if (ui_service_is_ready()) {
+        mcp_register_display_tools(s_mcp);
+        mcp_register_io_tools(s_mcp);
+    }
 #endif
     mcp_register_resources(s_mcp);
 

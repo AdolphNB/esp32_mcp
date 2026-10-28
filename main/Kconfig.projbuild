@@ -61,6 +61,26 @@ config APP_DISPLAY_IMAGE_URL_PREFIX
     string "Allowed image URL prefix (empty = disabled)"
     default ""
 
+choice APP_PROVISIONING_MODE
+    prompt "Wi-Fi provisioning method"
+    default APP_PROVISIONING_SOFTAP
+    config APP_PROVISIONING_SOFTAP
+        bool "SoftAP + web portal"
+    config APP_PROVISIONING_SCREEN
+        bool "On-screen touch UI"
+        depends on APP_ENABLE_DISPLAY && APP_DISPLAY_BACKEND_LVGL
+endchoice
+
+config APP_PROVISIONING_ALLOW_SOFTAP_FALLBACK
+    depends on APP_PROVISIONING_SCREEN
+    bool "Allow starting SoftAP from the screen as a fallback"
+    default y
+
+config APP_WIFI_SCAN_MAX
+    int "Maximum Wi-Fi scan results kept"
+    range 4 32
+    default 16
+
 config APP_FW_VERSION
     string "Firmware version"
     default "0.1.0"

@@ -11,15 +11,17 @@
 - PCF85063 RTC 驱动：I2C 0x51，INT = GPIO6
 - UI 场景模型：JSON 校验、坐标裁剪、页面管理、SPIFFS 持久化
 - Mock 显示后端：把场景写入日志，便于联调 MCP
-- MCP 显示工具：`display_info` / `display_render` / `display_page` / `display_clear` / `display_notify` / `display_brightness` / `display_calendar` / `display_todo` / `display_quote` / `display_horoscope` / `display_image`
+- LVGL 9 显示后端：RGB565 + GT911 + 页面渲染（text/clock/calendar/list/quote/horoscope/divider/progress）
+- 24px GB2312 中文字体（SPIFFS binfont，加载到 PSRAM）
+- 屏上 Wi-Fi 配网：扫描、选择 SSID、密码键盘、连接状态、Token 展示、SoftAP 备用
+- MCP 显示工具：`display_info` / `display_render` / `display_patch` / `display_page` / `display_clear` / `display_notify` / `display_brightness` / `display_calendar` / `display_todo` / `display_quote` / `display_horoscope` / `display_image`
 - 时钟服务：NTP + 时区 + PCF85063 + 农历/干支/生肖/节日
 - 独立构建配置：`sdkconfig.defaults.display`、`sdkconfig.defaults.display-mock`
 
 待硬件到货：
 
-- LVGL 9 + RGB LCD 后端（`ui_backend_lvgl.c` 目前是占位）
-- GT911 触摸、背光、RTC 实机验证
-- 字体子集生成与中文渲染
+- 实机验证 RGB/GT911/背光/RTC/DI-DO
+- 32px/48px 大字字体子集
 - 图片解码、二维码
 - I2C / RS485 / CAN / 隔离 IO 的 MCP 工具
 
@@ -103,7 +105,34 @@ idf.py -B build-43b \
 idf.py -B build-43b -p /dev/ttyACM0 flash monitor
 ```
 
+> `idf.py flash` 会同时写入 `storage.bin`（字体在 storage 分区）。如果只执行 `app-flash`，字体不会更新。
+
 > 官方 4.3B 示例建议 ESP-IDF 5.5.2；当前工程用 6.1 构建通过。实机 bring-up 时如果 LVGL/触摸组件在 6.1 下有问题，再统一降到 5.5.2 LTS。
+
+### 3.1 屏上配网
+
+显示构建默认使用 **屏上配网**，不再自动开 SoftAP：
+
+- 首次启动无 Wi-Fi 凭证时，屏幕直接进入“连接 Wi-Fi”页面
+- 点“重新扫描”列出 2.4 GHz 网络（按 RSSI 排序）
+- 点某个 SSID → 弹出密码页 + LVGL 键盘 → 点“连接”
+- 成功后屏幕显示 SSID、IP、MCP Token，点“进入桌面”回到仪表盘
+- 失败后停留配网页，可重新扫描/换网络
+- 点“手机配网”可临时启动 SoftAP + 网页作为备用（`APP_PROVISIONING_ALLOW_SOFTAP_FALLBACK`）
+- 点“清除配置”清除 Wi-Fi 并重启，回到配网页
+- 仪表盘右下角“设置”按钮可随时重新打开配网页
+
+相关 Kconfig：
+
+```ini
+CONFIG_APP_PROVISIONING_SCREEN=y
+CONFIG_APP_PROVISIONING_ALLOW_SOFTAP_FALLBACK=y
+CONFIG_APP_WIFI_SCAN_MAX=16
+```
+
+网页门户仍保留在端口 80，用于 STA 连接后的状态查看/OTA；它不再作为唯一的配网入口。
+
+> 屏上配网依赖 LVGL + GT911，实机验证前请先按 P0 清单确认屏幕和触摸正常。
 
 ## 4. UI 场景
 
@@ -144,6 +173,23 @@ idf.py -B build-43b -p /dev/ttyACM0 flash monitor
 ### 4.2 组件类型
 
 `text`、`big_text`、`clock`、`calendar`、`list`、`quote`、`horoscope`、`image`、`qr`、`divider`、`progress`。
+
+### 4.3 字体
+
+- `data/fonts/ui24.bin`：GB2312 一级字库 + ASCII + 标点，24px，约 948 KB
+- 启动时从 `/spiffs/fonts/ui24.bin` 读入 PSRAM，用 `lv_binfont_create_from_buffer()` 加载
+- 加载失败时回退到 LVGL 内置 16px CJK 字体
+- 重新生成：
+
+```bash
+./tools/gen_fonts.sh
+# 或指定字体：
+FONT=/path/to/NotoSansCJKsc-Regular.otf ./tools/gen_fonts.sh
+```
+
+> 字体在 `storage` 分区，必须用 `idf.py flash`（会写 `storage.bin`）；只烧 app 不会更新字体。
+
+后续可以再生成 32px/48px 子集，用于标题和“大字格言”。
 
 校验规则：
 

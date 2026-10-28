@@ -12,6 +12,13 @@ typedef enum {
     WIFI_MGR_STATE_ERROR,
 } wifi_mgr_state_t;
 
+typedef struct {
+    char ssid[33];
+    int rssi;
+    int auth;
+    int channel;
+} wifi_scan_item_t;
+
 esp_err_t wifi_manager_init(void);
 esp_err_t wifi_manager_start(void);
 
@@ -32,6 +39,11 @@ const uint8_t *wifi_manager_get_bssid(void);
 
 esp_err_t wifi_manager_connect(const char *ssid, const char *password);
 esp_err_t wifi_manager_forget(void);
+bool wifi_manager_has_credentials(void);
+void wifi_manager_set_screen_provisioning(bool enabled);
+
+/* Blocking scan. Returns up to max sorted-by-RSSI networks. */
+esp_err_t wifi_manager_scan(wifi_scan_item_t *out, int max, int *count);
 
 /* Starts the provisioning AP (used when no credentials or after failures). */
 esp_err_t wifi_manager_start_ap(void);

@@ -26,6 +26,8 @@
 
 `esp32-mcp-lcd43b` 分支在现有 MCP 节点上增加 **Waveshare ESP32-S3-Touch-LCD-4.3B** 支持：800×480 屏、GT911 触摸、PCF85063 RTC、隔离 DI/DO、RS485/CAN，目标是把 AI 推送的日历/待办/格言/星座卡片显示到桌面屏上。
 
+4.3B 默认使用 **屏上配网**：首次启动直接在屏幕上扫描/选择 Wi-Fi、输入密码，不再需要先连接 `ESP32-MCP-XXXX` 热点；SoftAP 仅作为屏幕里的备用入口。
+
 - 设计、引脚、场景 schema、MCP 工具和 Cherry Studio 配置：[`docs/DISPLAY.md`](docs/DISPLAY.md)
 - 无屏 mock 构建（现有 YD 板可跑）：
 

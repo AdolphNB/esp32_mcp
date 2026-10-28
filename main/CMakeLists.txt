@@ -20,6 +20,7 @@ idf_component_register(
         "mdns_service.c"
         "clock_service.c"
         "lunar.c"
+        "provisioning_backend.c"
     INCLUDE_DIRS "."
     REQUIRES
         nvs_flash
