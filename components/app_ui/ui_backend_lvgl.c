@@ -618,6 +618,8 @@ static esp_err_t lcd_init(void)
         return ESP_FAIL;
     }
 
+    board_backlight_set(true);
+
     i2c_master_bus_handle_t bus = board_i2c_bus();
     if (!bus) {
         ESP_LOGE(TAG, "I2C bus missing");
@@ -658,7 +660,6 @@ static esp_err_t lcd_init(void)
     };
     lvgl_port_add_touch(&touch_port_cfg);
 
-    board_backlight_set(true);
     ESP_LOGI(TAG, "RGB+LVGL ready: %dx%d, heap internal=%u KB psram=%u KB",
              b->width, b->height,
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),

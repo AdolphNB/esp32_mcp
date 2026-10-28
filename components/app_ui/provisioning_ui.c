@@ -89,7 +89,7 @@ static void pwd_connect(void)
         }
     }
     if (s_pwd_screen) {
-        lv_obj_del(s_pwd_screen);
+        lv_obj_del_async(s_pwd_screen);
         s_pwd_screen = NULL;
         s_pwd_ta = NULL;
     }
@@ -114,7 +114,7 @@ static void pwd_cancel_cb(lv_event_t *e)
 {
     (void)e;
     if (s_pwd_screen) {
-        lv_obj_del(s_pwd_screen);
+        lv_obj_del_async(s_pwd_screen);
         s_pwd_screen = NULL;
         s_pwd_ta = NULL;
     }
@@ -139,7 +139,8 @@ static void open_password(const char *ssid)
     snprintf(s_pwd_ssid, sizeof(s_pwd_ssid), "%s", ssid ? ssid : "");
 
     if (s_pwd_screen) {
-        lv_obj_del(s_pwd_screen);
+        lv_obj_del_async(s_pwd_screen);
+        s_pwd_screen = NULL;
     }
     s_pwd_screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s_pwd_screen, lv_color_hex(COL_BG), 0);
@@ -397,12 +398,12 @@ void provisioning_ui_hide(void)
         s_timer = NULL;
     }
     if (s_pwd_screen) {
-        lv_obj_del(s_pwd_screen);
+        lv_obj_del_async(s_pwd_screen);
         s_pwd_screen = NULL;
         s_pwd_ta = NULL;
     }
     if (s_screen) {
-        lv_obj_del(s_screen);
+        lv_obj_del_async(s_screen);
         s_screen = NULL;
         s_list = NULL;
         s_status = NULL;
