@@ -608,8 +608,12 @@ static esp_err_t lcd_init(void)
         .flags = {
             .buff_dma = false,
             .buff_spiram = false,
-            .full_refresh = false,
-            .direct_mode = true,
+            /* RGB panel double buffering swaps framebuffers on vsync, so every
+             * refresh must repaint the whole screen into both buffers. Direct
+             * mode only redraws invalid areas and leaves the other framebuffer
+             * stale, which shows up as missing widgets (e.g. half a keyboard). */
+            .full_refresh = true,
+            .direct_mode = false,
             .swap_bytes = false,
         },
     };
