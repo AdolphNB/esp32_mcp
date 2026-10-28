@@ -216,7 +216,9 @@ CONFIG_APP_WIFI_SCAN_MAX=16
 
 ### 4.3 字体
 
-- `data/fonts/ui24.bin`：GB2312 一级字库 + ASCII + 标点，24px，约 948 KB
+- `data/fonts/ui24.bin`：GB2312 一级字库 + ASCII/Latin-1 + 中英标点，24px，约 986 KB
+- ASCII/Latin 字形来自 Noto Sans，汉字与中文标点来自 Droid Sans Fallback，合并同一个 24px 字体，混排字号一致
+- U+3000、U+00A0 等 Unicode 空格在渲染前统一转成普通空格，避免缺字方框
 - 启动时从 `/spiffs/fonts/ui24.bin` 读入 PSRAM，用 `lv_binfont_create_from_buffer()` 加载
 - 加载失败时回退到 LVGL 内置 16px CJK 字体
 - 重新生成：

@@ -178,6 +178,53 @@ static lv_text_align_t align_from(const char *s)
     return LV_TEXT_ALIGN_LEFT;
 }
 
+static void sanitize_spaces(const char *in, char *out, size_t out_len)
+{
+    if (!out || out_len == 0) {
+        return;
+    }
+    size_t o = 0;
+    const unsigned char *p = (const unsigned char *)(in ? in : "");
+    while (*p && o + 1 < out_len) {
+        uint32_t cp = *p;
+        int len = 1;
+        if (cp >= 0xF0) {
+            cp &= 0x07;
+            len = 4;
+        } else if (cp >= 0xE0) {
+            cp &= 0x0F;
+            len = 3;
+        } else if (cp >= 0xC0) {
+            cp &= 0x1F;
+            len = 2;
+        }
+        bool valid = true;
+        for (int i = 1; i < len; i++) {
+            if (!p[i] || (p[i] & 0xC0) != 0x80) {
+                valid = false;
+                break;
+            }
+            cp = (cp << 6) | (p[i] & 0x3F);
+        }
+        if (!valid) {
+            p++;
+            continue;
+        }
+        /* Unicode spaces have no glyph in the 24px subset; use a plain space
+         * so they never turn into the font's "not found" box. */
+        if (cp == 0x00A0 || cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) ||
+                cp == 0x202F || cp == 0x205F || cp == 0x3000 || cp == 0xFEFF) {
+            out[o++] = ' ';
+        } else {
+            for (int i = 0; i < len && o + 1 < out_len; i++) {
+                out[o++] = (char)p[i];
+            }
+        }
+        p += len;
+    }
+    out[o] = '\0';
+}
+
 static lv_obj_t *make_label(lv_obj_t *parent, int x, int y, int w, int h,
                             const char *text, const lv_font_t *font,
                             uint32_t color, lv_text_align_t align)
@@ -193,7 +240,9 @@ static lv_obj_t *make_label(lv_obj_t *parent, int x, int y, int w, int h,
     lv_obj_set_style_text_align(l, align, 0);
     lv_obj_set_style_text_line_space(l, 4, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(l, text ? text : "");
+    char sanitized[768];
+    sanitize_spaces(text, sanitized, sizeof(sanitized));
+    lv_label_set_text(l, sanitized);
     return l;
 }
 
