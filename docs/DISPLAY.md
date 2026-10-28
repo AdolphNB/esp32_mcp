@@ -96,7 +96,18 @@ idf.py -B build-mock \
 idf.py -B build-mock -p /dev/ttyUSB0 flash monitor
 ```
 
-4.3B 显示配置（当前后端仍是 mock，LVGL 后端待实机）：
+4.3B 显示配置（推荐用脚本，避免误用 `build/` 里的 YD 固件）：
+
+```bash
+source ~/.espressif/tools/activate_idf_v6.1.sh
+./tools/build_43b.sh
+./tools/flash_43b.sh /dev/ttyACM0 --erase
+```
+
+`--erase` 会清掉 NVS（Wi-Fi/Token），首次 bring-up 建议加。  
+`flash_43b.sh` 会检查 `build-43b/sdkconfig` 的板型，以及 app 大小（约 2 MB），防止把 YD 固件烧进 4.3B。
+
+等价的手动命令：
 
 ```bash
 idf.py -B build-43b \

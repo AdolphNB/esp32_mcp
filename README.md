@@ -37,12 +37,12 @@ idf.py -B build-mock \
   -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.display-mock" build
 ```
 
-- 4.3B 构建：
+- 4.3B 构建/烧录（推荐脚本，避免误烧 `build/` 里的 YD 固件）：
 
 ```bash
-idf.py -B build-43b \
-  -D SDKCONFIG=build-43b/sdkconfig \
-  -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.display" build
+source ~/.espressif/tools/activate_idf_v6.1.sh
+./tools/build_43b.sh
+./tools/flash_43b.sh /dev/ttyACM0 --erase
 ```
 
 > 4.3B 当前使用 mock 显示后端；LVGL/RGB 后端在硬件到货后接入。
