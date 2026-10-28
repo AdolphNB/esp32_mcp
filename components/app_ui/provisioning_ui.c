@@ -142,19 +142,19 @@ static void open_mcp_info(void)
     lv_obj_set_style_pad_all(card, 0, 0);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
-    make_text(card, 16, 6, 700, 22, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, "ENDPOINT");
+    make_text(card, 16, 6, 700, 22, &lv_font_montserrat_14, COL_MUTED, "ENDPOINT");
     make_text(card, 16, 28, 720, 40, &lv_font_montserrat_28, COL_TEXT, st.mcp_url);
-    make_text(card, 16, 74, 700, 22, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, "TOKEN");
+    make_text(card, 16, 74, 700, 22, &lv_font_montserrat_14, COL_MUTED, "TOKEN");
     make_text(card, 16, 94, 720, 34, &lv_font_montserrat_24, COL_ACCENT, st.token);
-    make_text(card, 16, 136, 56, 22, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, "mDNS");
-    make_text(card, 76, 134, 650, 24, &lv_font_source_han_sans_sc_16_cjk, COL_MUTED, st.mdns_url);
+    make_text(card, 16, 136, 60, 22, &lv_font_montserrat_14, COL_MUTED, "mDNS");
+    make_text(card, 80, 132, 650, 26, &lv_font_montserrat_20, COL_MUTED, st.mdns_url);
 
     char line[128];
     snprintf(line, sizeof(line), "浏览器打开 %s 可查看并复制完整配置", st.web_url);
-    make_text(s_mcp_screen, 24, 284, 752, 30, ui_lvgl_cjk_font(), COL_MUTED, line);
-    make_text(s_mcp_screen, 24, 320, 752, 24, &lv_font_source_han_sans_sc_16_cjk,
+    make_text(s_mcp_screen, 24, 282, 752, 30, ui_lvgl_cjk_font(), COL_MUTED, line);
+    make_text(s_mcp_screen, 24, 314, 752, 30, ui_lvgl_cjk_font(),
               COL_MUTED, "客户端类型选 Streamable HTTP，认证头使用 Bearer Token");
-    make_text(s_mcp_screen, 24, 348, 752, 24, &lv_font_source_han_sans_sc_16_cjk,
+    make_text(s_mcp_screen, 24, 346, 752, 30, ui_lvgl_cjk_font(),
               COL_MUTED, "请求头填 Authorization: Bearer 加屏幕上的 Token");
 
     lv_obj_t *back = make_button(s_mcp_screen, 24, 400, 160, 48, "返回");

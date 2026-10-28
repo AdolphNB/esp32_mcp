@@ -39,8 +39,9 @@ python3 - "$CHARS" <<'PY'
 import sys
 
 chars = []
-# GB2312 level 1 (3755 common hanzi)
-for hi in range(0xB0, 0xD8):
+# GB2312 level 1 + level 2 (6763 hanzi). Level 2 contains common characters
+# such as 浏 (as in 浏览器), which are missing from level 1-only subsets.
+for hi in range(0xB0, 0xF8):
     for lo in range(0xA1, 0xFF):
         try:
             c = bytes([hi, lo]).decode('gb2312')

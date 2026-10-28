@@ -216,7 +216,7 @@ CONFIG_APP_WIFI_SCAN_MAX=16
 
 ### 4.3 字体
 
-- `data/fonts/ui24.bin`：GB2312 一级字库 + ASCII/Latin-1 + 中英标点，24px，约 986 KB
+- `data/fonts/ui24.bin`：GB2312 一级 + 二级字库（6763 汉字）+ ASCII/Latin-1 + 中英标点，24px，约 1.75 MB
 - ASCII/Latin 字形来自 Noto Sans，汉字与中文标点来自 Droid Sans Fallback，合并同一个 24px 字体，混排字号一致
 - U+3000、U+00A0 等 Unicode 空格在渲染前统一转成普通空格，避免缺字方框
 - 启动时从 `/spiffs/fonts/ui24.bin` 读入 PSRAM，用 `lv_binfont_create_from_buffer()` 加载
@@ -403,7 +403,7 @@ PSRAM（8 MB）：
 | 项目 | 估算 |
 | --- | --- |
 | RGB 双 framebuffer（800×480×2×2） | 1.5 MB |
-| 中文字体（26/32/48，压缩 binfont） | 2.5–3.0 MB |
+| 中文字体（24px，GB2312 全字库） | 1.8 MB |
 | LVGL 堆 / 对象 / 图片解码 | 0.8–1.2 MB |
 | 场景 JSON、页面、队列 | 0.2 MB |
 | 余量 | ≥ 1.5 MB |
@@ -422,7 +422,7 @@ PSRAM（8 MB）：
 
 结论：**PSRAM 充足，内部 SRAM 偏紧但可满足**。关键措施：
 
-- LVGL 使用 RGB **direct mode**，framebuffer 全部在 PSRAM，不额外分配内部 draw buffer。
+- LVGL 使用 RGB 双 framebuffer + **full refresh**（avoid tearing），framebuffer 全部在 PSRAM，不额外分配内部 draw buffer。
 - LVGL/UI 任务栈优先放 PSRAM（`CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y`）。
 - 字体从 SPIFFS 加载到 PSRAM；场景 JSON 也放 PSRAM。
 - LVGL 只编译用到的 widget，关闭 demo、动画、多余字体。

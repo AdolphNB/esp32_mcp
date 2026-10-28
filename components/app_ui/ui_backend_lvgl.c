@@ -569,7 +569,7 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
                    ui_lvgl_cjk_font(), COL_ACCENT, LV_TEXT_ALIGN_LEFT);
         top = 38;
     }
-    int hint_h = interactive ? 24 : 0;
+    int hint_h = interactive ? 32 : 0;
     lv_obj_t *list = lv_obj_create(card);
     lv_obj_set_pos(list, 0, top);
     lv_obj_set_size(list, cw, ch - top - hint_h);
@@ -581,9 +581,9 @@ static void render_list(lv_obj_t *parent, const cJSON *w, int x, int y, int ww, 
     lv_obj_set_scroll_dir(list, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
     if (interactive) {
-        lv_obj_t *hint = make_label(card, 0, ch - hint_h + 2, cw, 22,
+        lv_obj_t *hint = make_label(card, 0, ch - hint_h + 2, cw, 30,
                                     "点按勾选，长按拖动排序",
-                                    &lv_font_source_han_sans_sc_16_cjk, COL_MUTED,
+                                    ui_lvgl_cjk_font(), COL_MUTED,
                                     LV_TEXT_ALIGN_LEFT);
         if (hint) {
             lv_obj_set_clickable(hint, false);
