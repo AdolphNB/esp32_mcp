@@ -255,6 +255,7 @@ esp_err_t ui_service_init(void)
             ESP_LOGE(TAG, "failed to build default home scene");
         }
     }
+    ESP_LOGI(TAG, "pages loaded, page0=%s", s_pages[0].json ? "yes" : "no");
     if (!s_pages[0].json) {
         ESP_LOGE(TAG, "no scene on page 0 after init");
     }

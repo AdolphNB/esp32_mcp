@@ -523,6 +523,7 @@ static void render_widget(lv_obj_t *screen, const cJSON *w)
 
 static esp_err_t lcd_init(void)
 {
+    ESP_LOGI(TAG, "lcd_init begin");
     const board_desc_t *b = board_get();
     if (!b || !b->has_display) {
         return ESP_ERR_NOT_SUPPORTED;
@@ -563,11 +564,13 @@ static esp_err_t lcd_init(void)
     }
 
     esp_lcd_panel_handle_t panel = NULL;
+    ESP_LOGI(TAG, "creating RGB panel");
     esp_err_t err = esp_lcd_new_rgb_panel(&cfg, &panel);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "RGB panel init failed: %s", esp_err_to_name(err));
         return err;
     }
+    ESP_LOGI(TAG, "RGB panel created, starting");
     err = esp_lcd_panel_init(panel);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "RGB panel start failed: %s", esp_err_to_name(err));
@@ -582,6 +585,7 @@ static esp_err_t lcd_init(void)
         .task_stack_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
         .timer_period_ms = 5,
     };
+    ESP_LOGI(TAG, "LVGL port init");
     err = lvgl_port_init(&port_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "lvgl_port_init failed: %s", esp_err_to_name(err));
@@ -615,12 +619,14 @@ static esp_err_t lcd_init(void)
             .avoid_tearing = true,
         },
     };
+    ESP_LOGI(TAG, "adding RGB display to LVGL");
     s_disp = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
     if (!s_disp) {
         ESP_LOGE(TAG, "add RGB display failed");
         return ESP_FAIL;
     }
 
+    ESP_LOGI(TAG, "display added, backlight on");
     board_backlight_set(true);
 
     i2c_master_bus_handle_t bus = board_i2c_bus();
@@ -661,6 +667,7 @@ static esp_err_t lcd_init(void)
         .handle = touch,
         .scale = {1.0f, 1.0f},
     };
+    ESP_LOGI(TAG, "adding touch");
     lvgl_port_add_touch(&touch_port_cfg);
 
     if (ui_lvgl_lock(2000)) {
