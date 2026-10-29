@@ -86,8 +86,8 @@
 4. `curl` 完成 `initialize` → `tools/list` 返回 11 个工具。
 5. 带 token 调用 `gpio_write` 可改变允许引脚电平；不带 token 返回 401。
 6. 调用未授权引脚返回 `isError: true`，错误码 `pin_not_allowed`。
-7. Hermes `hermes mcp test esp32_mcp` 通过，能调用 `device_info`。
-8. OpenClaw `openclaw mcp probe esp32 --json` 通过，能调用 `gpio_read`。
+7. Hermes `hermes mcp test esp32_desk` 通过，能调用 `device_info`。
+8. OpenClaw `openclaw mcp probe esp32_desk --json` 通过，能调用 `gpio_read`。
 9. 重启后自动入网，无需重新配网。
 10. 输入错误密码后回到配网页面并显示错误原因。
 11. 长按 BOOT 5 s 后重启进入配网模式，旧凭证被清除。
@@ -422,7 +422,7 @@ esp_mcp_t *mcp = NULL;
 ESP_ERROR_CHECK(esp_mcp_create(&mcp));
 ESP_ERROR_CHECK(esp_mcp_set_server_info(
     mcp,
-    "ESP32-S3 MCP Node",
+    "esp32_desk - ESP32-S3 MCP Node",
     "Wi-Fi connected ESP32-S3 device exposing GPIO and status tools.",
     NULL,
     NULL));
@@ -876,7 +876,7 @@ Hermes 的 MCP 配置使用 `url` + `headers`，支持 Streamable HTTP。示例�
 
 ```yaml
 mcp_servers:
-  esp32_mcp:
+  esp32_desk:
     url: "http://192.168.3.50:8080/mcp"
     headers:
       Authorization: "Bearer <token>"
@@ -897,27 +897,27 @@ mcp_servers:
 验证：
 
 ```bash
-hermes mcp test esp32_mcp
+hermes mcp test esp32_desk
 ```
 
 成功后在 Hermes 中执行：
 
 ```text
-调用 esp32_mcp 的 device_info，然后读取 GPIO 4 的电平。
+调用 esp32_desk 的 device_info，然后读取 GPIO 4 的电平。
 ```
 
 注意：
 
 - 首次连接后如修改配置，执行 `/reload-mcp`；
 - 建议先用 `tools.include` 只开放只读工具，确认无误后再加入 `gpio_write`；
-- Hermes 会把工具名加前缀，实际名称可能是 `mcp_esp32_mcp_device_info`，以 `tools/list` 为准。
+- Hermes 会把工具名加前缀，实际名称可能是 `mcp_esp32_desk_device_info`，以 `tools/list` 为准。
 
 ### 9.3 OpenClaw
 
 OpenClaw 保存的 MCP 定义默认使用 SSE；**必须显式指定 `transport: "streamable-http"`**，否则会按旧 SSE 传输连接并失败。
 
 ```bash
-openclaw mcp set esp32_mcp '{
+openclaw mcp set esp32_desk '{
   "url": "http://192.168.3.50:8080/mcp",
   "transport": "streamable-http",
   "headers": {"Authorization": "Bearer <token>"},
@@ -931,21 +931,21 @@ openclaw mcp set esp32_mcp '{
 验证：
 
 ```bash
-openclaw mcp probe esp32_mcp --json
-openclaw mcp doctor esp32_mcp --probe
+openclaw mcp probe esp32_desk --json
+openclaw mcp doctor esp32_desk --probe
 ```
 
 限制工具范围（推荐）：
 
 ```bash
-openclaw mcp configure esp32_mcp \
+openclaw mcp configure esp32_desk \
   --include 'device_info,sys_status,wifi_status,gpio_list,gpio_read'
 ```
 
 确认只读无误后，再按需加入：
 
 ```bash
-openclaw mcp configure esp32_mcp \
+openclaw mcp configure esp32_desk \
   --include 'device_info,sys_status,wifi_status,gpio_list,gpio_read,gpio_write,gpio_pulse'
 ```
 
@@ -986,7 +986,7 @@ asyncio.run(main())
 
 ```text
 _http._tcp.local
-  instance: ESP32-S3 MCP Node
+  instance: esp32_desk (esp32-mcp-a1b2)
   host: esp32-mcp-a1b2.local
   port: 8080
   txt: path=/mcp, mcp=1, version=0.1.0, model=ESP32-S3
@@ -1291,9 +1291,9 @@ I (18230) mdns: host=esp32-mcp-a1b2.local, service=_http._tcp:8080
 | --- | --- | --- |
 | curl | initialize / tools/list / tools/call | 正确 JSON，会话头存在 |
 | Python `mcp` SDK | `tools/test_mcp.py` | 列出 11 个工具，`device_info` 成功 |
-| Hermes | `hermes mcp test esp32_mcp` | 连接成功，工具可见 |
-| OpenClaw | `openclaw mcp probe esp32_mcp --json` | `ok=true`，工具数 8 |
-| OpenClaw | `openclaw mcp doctor esp32_mcp --probe` | 无错误 |
+| Hermes | `hermes mcp test esp32_desk` | 连接成功，工具可见 |
+| OpenClaw | `openclaw mcp probe esp32_desk --json` | `ok=true`，工具数 8 |
+| OpenClaw | `openclaw mcp doctor esp32_desk --probe` | 无错误 |
 
 ### 14.4 安全测试
 
@@ -1570,7 +1570,8 @@ MCP-Protocol-Version: 2025-06-18
       "resources": { "subscribe": false, "listChanged": false }
     },
     "serverInfo": {
-      "name": "ESP32-S3 MCP Node",
+      "name": "esp32_mcp",
+      "title": "esp32_desk - ESP32-S3 MCP Node",
       "version": "0.1.0"
     },
     "instructions": "This device controls only the GPIO pins listed by gpio_list..."

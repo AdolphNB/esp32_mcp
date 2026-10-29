@@ -5,6 +5,8 @@
 #define APP_FW_VERSION        CONFIG_APP_FW_VERSION
 #define APP_NVS_NAMESPACE     "app_cfg"
 #define APP_MCP_PORT          CONFIG_APP_MCP_PORT
+/* Canonical MCP name shared by all clients, docs and the provisioning page. */
+#define APP_MCP_NAME          "esp32_desk"
 #define APP_WEB_PORT          CONFIG_APP_WEB_PORT
 #define APP_AP_PREFIX         CONFIG_APP_AP_PREFIX
 #define APP_AP_PASSWORD       CONFIG_APP_AP_PASSWORD

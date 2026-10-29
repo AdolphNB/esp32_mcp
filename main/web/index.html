@@ -230,12 +230,13 @@
   }
 
   function buildConfigs(s) {
+    const name = 'esp32_desk';
     const url = (s && s.mcp_url) || ((s && s.ip) ? 'http://' + s.ip + ':8080/mcp' : '');
     const mdns = (s && s.mdns) ? 'http://' + s.mdns + ':8080/mcp' : '';
     const tok = tokenReady() ? token : '<TOKEN>';
     const hermes = [
       'mcp_servers:',
-      '  esp32_mcp:',
+      '  ' + name + ':',
       '    url: "' + url + '"',
       '    headers:',
       '      Authorization: "Bearer ' + tok + '"',
@@ -250,7 +251,7 @@
       '      resources: true',
       '      prompts: false'
     ].join('\n');
-    const openclaw = 'openclaw mcp set esp32_mcp \'{\n' +
+    const openclaw = 'openclaw mcp set ' + name + ' \'{\n' +
       '  "url": "' + url + '",\n' +
       '  "transport": "streamable-http",\n' +
       '  "headers": {"Authorization": "Bearer ' + tok + '"},\n' +
@@ -260,7 +261,7 @@
     const generic = [
       '{',
       '  "mcpServers": {',
-      '    "esp32_mcp": {',
+      '    "' + name + '": {',
       '      "type": "http",',
       '      "url": "' + url + '",',
       '      "headers": { "Authorization": "Bearer ' + tok + '" }',
@@ -297,7 +298,7 @@
   function allConfigText(s) {
     const c = buildConfigs(s);
     return [
-      'ESP32-S3 MCP Node',
+      'esp32_desk - ESP32-S3 MCP Node',
       'Endpoint : ' + c.url,
       'mDNS     : ' + c.mdns,
       'Token    : ' + (tokenReady() ? token : '<TOKEN>'),

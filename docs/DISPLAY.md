@@ -316,7 +316,7 @@ Cherry Studio：
 ```json
 {
   "mcpServers": {
-    "esp32-display": {
+    "esp32_desk": {
       "type": "streamableHttp",
       "url": "http://192.168.3.50:8080/mcp",
       "headers": { "Authorization": "Bearer <token>" }
@@ -329,7 +329,7 @@ Hermes：
 
 ```yaml
 mcp_servers:
-  esp32_display:
+  esp32_desk:
     url: "http://192.168.3.50:8080/mcp"
     headers:
       Authorization: "Bearer <token>"

@@ -1,5 +1,7 @@
 #include "mdns_service.h"
 
+#include <stdio.h>
+
 #include "app_config.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
@@ -21,7 +23,10 @@ esp_err_t mdns_service_start(void)
         return err;
     }
     mdns_hostname_set(nvs_store_get_hostname());
-    mdns_instance_name_set("ESP32-S3 MCP Node");
+
+    char instance[96];
+    snprintf(instance, sizeof(instance), APP_MCP_NAME " (%s)", nvs_store_get_hostname());
+    mdns_instance_name_set(instance);
 
     mdns_txt_item_t txt[] = {
         {"path", "/mcp"},

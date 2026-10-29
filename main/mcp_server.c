@@ -39,7 +39,11 @@ esp_err_t mcp_server_init(void)
     }
 
     esp_mcp_set_server_info(s_mcp,
-        "ESP32-S3 MCP Node",
+#if CONFIG_APP_ENABLE_DISPLAY
+        APP_MCP_NAME " - ESP32-S3 Desk Display (4.3B)",
+#else
+        APP_MCP_NAME " - ESP32-S3 MCP Node",
+#endif
 #if CONFIG_APP_ENABLE_DISPLAY
         "Wi-Fi connected ESP32-S3 desk display exposing UI, calendar, todo, GPIO, "
         "isolated IO and OTA tools.",
