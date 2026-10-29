@@ -1,130 +1,114 @@
-# ESP32-S3 MCP Node
+# ESP32-S3 MCP 桌面显示（4.3"）
 
-基于 **YD-ESP32-S3 N16R8** 的 Wi-Fi MCP 节点：通过 SoftAP 网页配网接入局域网，并以 **MCP Streamable HTTP** 对外提供设备状态、GPIO、WS2812 和 OTA 能力。
+> **当前分支：`esp32-mcp-lcd43b`** — Waveshare ESP32-S3-Touch-LCD-4.3B 显示版。
+> 基础 MCP 节点（YD-ESP32-S3，无屏）请切换到 **`main`** 分支查看它的 README。
 
-目标客户端：**Hermes Agent**、**OpenClaw**，以及任意标准 MCP 客户端。
+一块 4.3 寸、800×480 的桌面屏，运行标准 **MCP Streamable HTTP** 服务端。AI 客户端（Cherry Studio / Hermes / OpenClaw）可以：
 
----
+- 推送日历、农历、待办、格言、星座运势、进度条等卡片
+- 在屏上完成 Wi-Fi 配网，并直接看到 MCP Endpoint / Token
+- 点按勾选待办、长按拖动排序
+- 通过 MCP 控制 GPIO、隔离 DI/DO、I2C、RS485、CAN
+- 通过局域网 OTA 升级并自动回滚
 
-## 当前状态
-
-- ✅ ESP-IDF v6.1 工程骨架
-- ✅ 16 MB Flash / 8 MB OPI PSRAM 配置
-- ✅ 双 OTA 分区 + 回滚
-- ✅ SoftAP + Captive Portal 配网页面
-- ✅ MCP Streamable HTTP（`/mcp`，端口 8080）
-- ✅ 11 个 MCP 工具 + 2 个资源
-- ✅ WS2812（GPIO48）
-- ✅ `idf.py build` 通过，固件约 1.3 MB
-- ✅ 实机烧录 / 配网 / MCP 握手验证通过
-
-详细设计见 [`docs/DESIGN.md`](docs/DESIGN.md)。
+详细设计、引脚、场景 schema 与客户端配置见 [`docs/DISPLAY.md`](docs/DISPLAY.md)。
 
 ---
 
-## 4.3 寸桌面显示平台
+## 本分支已实现
 
-`esp32-mcp-lcd43b` 分支在现有 MCP 节点上增加 **Waveshare ESP32-S3-Touch-LCD-4.3B** 支持：800×480 屏、GT911 触摸、PCF85063 RTC、隔离 DI/DO、RS485/CAN，目标是把 AI 推送的日历/待办/格言/星座卡片显示到桌面屏上。
-
-4.3B 默认使用 **屏上配网**：首次启动直接在屏幕上扫描/选择 Wi-Fi、输入密码，不再需要先连接 `ESP32-MCP-XXXX` 热点；SoftAP 仅作为屏幕里的备用入口。
-
-- 设计、引脚、场景 schema、MCP 工具和 Cherry Studio 配置：[`docs/DISPLAY.md`](docs/DISPLAY.md)
-- 无屏 mock 构建（现有 YD 板可跑）：
-
-```bash
-idf.py -B build-mock \
-  -D SDKCONFIG=build-mock/sdkconfig \
-  -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.display-mock" build
-```
-
-- 4.3B 构建/烧录（推荐脚本，避免误烧 `build/` 里的 YD 固件）：
-
-```bash
-source ~/.espressif/tools/activate_idf_v6.1.sh
-./tools/build_43b.sh
-./tools/flash_43b.sh /dev/ttyACM0 --erase
-```
-
-> 4.3B 当前使用 mock 显示后端；LVGL/RGB 后端在硬件到货后接入。
+- ✅ Waveshare ESP32-S3-Touch-LCD-4.3B 板级支持（800×480 RGB565、GT911 触摸、CH422G、PCF85063 RTC）
+- ✅ LVGL 9 显示后端：场景 JSON + 4 个页面 + SPIFFS 持久化
+- ✅ 屏上配网：扫描 SSID、屏上键盘、连接状态；SoftAP 仅作备用
+- ✅ 配网成功后自动显示 MCP 配置页（Endpoint / Token / mDNS / 网页入口）
+- ✅ 待办交互：点按勾选（删除线）、长按拖动排序，状态写回场景
+- ✅ 品牌开机 Logo、完整 GB2312 字体（6763 汉字 + 中英混排 + 标点）
+- ✅ MCP 显示工具 11 个，设备 / GPIO / 隔离 IO / OTA 工具保留
+- ✅ 双 OTA 分区 + 健康检查 + 自动回滚
+- ✅ 三种构建：`build-43b` / YD 节点 / 无屏 mock
 
 ---
 
 ## 硬件
 
+### 主目标板：Waveshare ESP32-S3-Touch-LCD-4.3B (SKU 28141)
+
 | 项目 | 参数 |
 | --- | --- |
-| 开发板 | YD-ESP32-S3 N16R8 |
-| Flash | 16 MB |
-| PSRAM | 8 MB OPI |
-| LED | WS2812，GPIO48 |
-| USB | CH343P（`/dev/ttyUSB0`）+ 原生 USB（`/dev/ttyACM0`） |
-| 按键 | BOOT（GPIO0）、RST |
+| 屏幕 | 4.3" IPS，800×480，RGB565 |
+| 触摸 | GT911（I2C） |
+| RTC | PCF85063（I2C 0x51） |
+| IO 扩展 | CH422G（mode `0x24` / OC `0x23` / IO `0x38` / 输入 `0x26`） |
+| 隔离 IO | DI0–DI1（5–36V）、DO0–DO3 |
+| 现场总线 | RS485（TX44/RX43）、CAN（TX15/RX16） |
+| Flash / PSRAM | 16 MB / 8 MB OPI |
+| 控制台 | 原生 USB Serial/JTAG（`/dev/ttyACM0`） |
 
-> GPIO35/36/37 被 OPI PSRAM 占用，不要外接。
-> 默认 GPIO 白名单：`4,5,6,7,8,15,16,17,18,21,38`。
+> **GPIO0 和 GPIO48 是 LCD 数据线**：运行期间 BOOT 键与 WS2812 不可用，恢复出厂请走网页或屏上 UI。
+
+### 兼容开发板：YD-ESP32-S3 N16R8
+
+无屏节点仍可在本分支构建（mock 显示后端），用于联调 MCP/UI/农历。
 
 ---
 
-## 构建
+## 快速开始（4.3B）
 
 ```bash
 source ~/.espressif/tools/activate_idf_v6.1.sh
 cd /home/alan/myPrj/esp32_mcp
-idf.py set-target esp32s3
-idf.py build
+
+./tools/build_43b.sh
+./tools/flash_43b.sh /dev/ttyACM0 --erase   # 首次建议整片擦除
+idf.py -B build-43b -p /dev/ttyACM0 monitor
 ```
 
-首次烧录（会写入新的双 OTA 分区表；建议先整片擦除，避免旧 otadata 指向旧分区）：
+脚本会校验板级配置和固件大小，并整片写入 app + `storage.bin`（字体和页面资源在 storage 分区）。
+
+> 不要直接 `idf.py flash`：默认 `build/` 可能是 YD 节点固件。
+
+### VS Code
+
+工作区已默认使用 `build-43b`。若“小火苗”烧错固件，确认：
+
+- `idf.buildPath = build-43b`
+- `idf.sdkconfigFilePath = build-43b/sdkconfig`
+- 或直接用上面的脚本烧录
+
+### 其他构建
 
 ```bash
-idf.py -p /dev/ttyUSB0 erase-flash
-idf.py -p /dev/ttyUSB0 flash monitor
-# 或原生 USB：
-idf.py -p /dev/ttyACM0 erase-flash
-idf.py -p /dev/ttyACM0 flash monitor
-```
+# YD 无屏节点
+idf.py -B build -D SDKCONFIG=build/sdkconfig build
 
-如果提示串口权限不足：
-
-```bash
-sudo usermod -aG dialout "$USER"   # 重新登录后生效
-# 或临时：
-sudo chmod 666 /dev/ttyUSB0
+# 无屏 mock（验证 UI/农历/MCP）
+idf.py -B build-mock \
+  -D SDKCONFIG=build-mock/sdkconfig \
+  -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.display-mock" build
 ```
 
 ---
 
-## 首次配网
+## 首次开机
 
-1. 上电后连接热点：`ESP32-MCP-XXXX`，默认密码 `esp32mcp`。
-2. 浏览器打开 `http://192.168.4.1`（或等待 Captive Portal 自动弹出）。
-3. 扫描并选择 Wi-Fi，输入密码，点击“连接”。
-4. 成功后页面显示：
-   - MCP Endpoint：`http://<ip>:8080/mcp`
-   - mDNS 地址：`http://<hostname>.local:8080/mcp`
-   - Bearer Token（每台设备独立，存 NVS）
-   - 可直接复制的 Hermes / OpenClaw / 通用 JSON / curl 配置块
-
-“MCP 接入信息”卡片会一次性列出全部接入参数，每块都有复制按钮，点“复制全部接入信息”可把 Endpoint、mDNS、Token 和各客户端配置一起拷走。
-
-AP 会在 STA 连接成功 2 分钟后自动关闭。Wi-Fi 凭证和 Token 掉电保存。配网成功页会显示 Token，请及时复制；之后也可从串口日志或重新配网获取。
-
-> 配网页（`192.168.4.1`）和 STA 状态页（设备局域网 IP）是两个不同的浏览器 origin，localStorage 不会共享。切换到 STA 页面后，把 Token 粘贴到“MCP 接入信息 → Bearer Token”输入框（或“高级 → MCP Token”）即可；粘贴后下方所有配置会实时更新，Token 只保存在本浏览器。
-
-长按 BOOT 5 秒会恢复出厂：清除 Wi-Fi 配置**并重新生成 Token**，之后需要重新配网。
+1. 屏幕先显示“奇点临近 / SINGULARITY NEAR”开机 Logo（约 1 秒）
+2. 无 Wi-Fi 凭证时自动进入“连接 Wi-Fi”：扫描 → 选 SSID → 屏上键盘输入密码 → 连接
+3. 连接成功后自动显示 **MCP 配置页**：
+   - `http://<ip>:8080/mcp`
+   - 32 位 Bearer Token
+   - `http://<hostname>.local:8080/mcp`
+   - 浏览器打开 `http://<ip>/` 可复制完整客户端配置
+4. 点“进入桌面”回到仪表盘；仪表盘右下角“设置”可再次打开配网页
 
 ### 找回 Token
 
-Token 只在生成时完整打印到配网页面，串口日志仅有后 4 位。若已丢失：
+Token 存在 NVS，每台设备独立。若丢失：
 
 ```bash
-# 方式一：AP 模式（热点开启时无需鉴权）
-curl -s http://192.168.4.1/api/status | python3 -c "import sys,json;print(json.load(sys.stdin)['mcp_token'])"
-
-# 方式二：已知 Token 时
+# 已连接时（需要旧 Token 才能读敏感字段）
 curl -s http://<ip>/api/status -H "Authorization: Bearer <token>"
 
-# 方式三：直接读 NVS 分区（不破坏配置）
+# 或直接读 NVS（需要串口未被占用）
 esptool.py -p /dev/ttyACM0 read-flash 0x9000 0x6000 /tmp/nvs.bin
 python3 $IDF_PATH/components/nvs_flash/nvs_partition_tool/nvs_tool.py \
         -d minimal /tmp/nvs.bin | grep mcp_token
@@ -132,116 +116,104 @@ python3 $IDF_PATH/components/nvs_flash/nvs_partition_tool/nvs_tool.py \
 
 > NVS dump 同时包含 Wi-Fi 密码，属于敏感文件，不要外传。
 
-
 ---
 
-## 接入 Hermes
+## 接入 MCP 客户端
 
-`~/.hermes/config.yaml`：
+统一名称：`esp32_desk`。传输方式：**Streamable HTTP**，认证头：
+
+```text
+Authorization: Bearer <屏幕上的 Token>
+```
+
+### Cherry Studio
+
+```json
+{
+  "mcpServers": {
+    "esp32_desk": {
+      "type": "streamableHttp",
+      "url": "http://<ip>:8080/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+### Hermes
 
 ```yaml
 mcp_servers:
-  esp32_mcp:
-    url: "http://192.168.3.50:8080/mcp"
+  esp32_desk:
+    url: "http://<ip>:8080/mcp"
     headers:
       Authorization: "Bearer <token>"
-    tools:
-      include:
-        - device_info
-        - sys_status
-        - wifi_status
-        - gpio_list
-        - gpio_read
-        - ota_status
-      resources: true
-      prompts: false
+    resources: true
+    prompts: false
 ```
 
 ```bash
-hermes mcp test esp32_mcp
+hermes mcp test esp32_desk
 ```
 
----
-
-## 接入 OpenClaw
-
-必须显式使用 `streamable-http`：
+### OpenClaw
 
 ```bash
-openclaw mcp set esp32_mcp '{
-  "url": "http://192.168.3.50:8080/mcp",
+openclaw mcp set esp32_desk '{
+  "url": "http://<ip>:8080/mcp",
   "transport": "streamable-http",
   "headers": {"Authorization": "Bearer <token>"},
   "connectionTimeoutMs": 5000,
   "requestTimeoutMs": 15000
 }'
-
-openclaw mcp probe esp32_mcp --json
-openclaw mcp doctor esp32_mcp --probe
+openclaw mcp probe esp32_desk --json
 ```
 
-> `openclaw mcp set/add/configure` 等写操作要求本地 Gateway 已停止；只读的 `status/list/show` 不受影响。
+> 如果客户端收到 401 并去探测 `/.well-known/...`，说明 Authorization 头缺失或 Token 过期；重新从屏上 MCP 配置页复制即可。
 
 ---
 
 ## MCP 工具
 
+### 显示
+
 | 工具 | 说明 |
 | --- | --- |
-| `device_info` | 芯片、MAC、固件、Flash、运行时间 |
-| `sys_status` | 堆、任务数、CPU、复位原因 |
-| `wifi_status` | SSID、IP、RSSI、信道、mDNS |
-| `gpio_list` | 白名单引脚与电平 |
-| `gpio_read` | 读引脚 |
-| `gpio_write` | 写引脚（`level`: `high`/`low`，可选 `hold_ms`） |
-| `gpio_pulse` | 非阻塞脉冲（10–5000 ms） |
-| `led_set` | 板载 WS2812（颜色/亮度） |
-| `ota_status` | OTA 状态与进度 |
-| `ota_apply` | 从局域网 URL 升级 |
-| `ota_abort` | 取消 OTA |
+| `display_info` | 当前页、亮度、后端、页面状态 |
+| `display_render` | 渲染自定义 scene JSON |
+| `display_patch` | 按 `id` 更新单个组件 |
+| `display_page` | 切换页面 |
+| `display_clear` | 清空页面 |
+| `display_notify` | 悬浮提示 |
+| `display_brightness` | 亮度 0–100 |
+| `display_calendar` | 日历/农历模板 |
+| `display_todo` | 待办模板；屏上可点按勾选、长按拖动排序 |
+| `display_quote` | 格言卡片（文字垂直居中） |
+| `display_horoscope` | 星座运势卡片 |
 
-资源：`device://info`、`device://gpio`。
+### 设备 / IO / 系统
+
+| 工具 | 说明 |
+| --- | --- |
+| `device_info` / `sys_status` / `wifi_status` | 设备、堆、Wi-Fi 状态 |
+| `gpio_list` / `gpio_read` / `gpio_write` / `gpio_pulse` / `led_set` | GPIO 与 WS2812 |
+| `io_status` / `io_read` / `io_write` | 隔离 DI/DO、I2C/RS485/CAN 引脚 |
+| `i2c_scan` | 扫描外部 I2C 总线 |
+| `ota_status` / `ota_apply` / `ota_abort` | 局域网 OTA |
+
+完整参数和场景 schema：[`docs/DISPLAY.md`](docs/DISPLAY.md)。
 
 ---
 
 ## OTA
 
-### 方式一：网页上传
+网页：打开 `http://<ip>/`，上传 `build-43b/esp32_mcp.bin`。
 
-打开 `http://<ip>/`，在“OTA 固件升级”中选择 `build/esp32_mcp.bin`，填写可选 SHA256/版本，上传。
-
-- 写入备用 4 MB 分区；
-- 校验镜像与 SHA256；
-- 切换启动分区并重启；
-- 新固件 30 秒健康检查通过后标记有效；
-- 失败/崩溃自动回滚。
-
-### 发布一个可 OTA 的新版本
-
-```bash
-# 1. 修改 CMakeLists.txt 里的 PROJECT_VER，例如 0.2.0
-sed -i 's/set(PROJECT_VER "0.1.0")/set(PROJECT_VER "0.2.0")/' CMakeLists.txt
-
-# 2. 重新构建
-idf.py build
-
-# 3. 启动局域网固件服务
-./tools/serve_firmware.sh 0.2.0
-```
-
-Agent OTA 只接受与镜像 `esp_app_desc.version` 一致的 `version` 参数，并且默认拒绝同版本/降级。
-
-### 方式二：Agent 触发
-
-在局域网运行静态固件服务：
+Agent：先启动局域网固件服务，再调用 `ota_apply`：
 
 ```bash
 ./tools/serve_firmware.sh 0.2.0
 ```
-
-脚本会复制固件、计算 SHA256，并启动 `python3 -m http.server 8000`。
-
-然后让 Agent 调用：
 
 ```json
 {
@@ -255,17 +227,9 @@ Agent OTA 只接受与镜像 `esp_app_desc.version` 一致的 `version` 参数�
 }
 ```
 
-设备立即返回 `accepted`，后台下载；用 `ota_status` 轮询。
-
-> 设备侧只允许 `CONFIG_APP_OTA_ALLOWED_URL_PREFIX` 开头的 URL。当前默认按本机
-> `192.168.3.110:8000` 配置；如果固件服务器 IP 变化，请修改：
-
-```bash
-idf.py menuconfig
-# ESP32 MCP Node -> Allowed OTA URL prefix
-```
-
-第一版不做 Secure Boot；SHA256 只防损坏，不防恶意替换。固件服务器必须放在可信机器上，且不要暴露到公网。
+- 写入备用 4 MB 分区，校验 SHA256
+- 切换分区重启，30 秒健康检查，失败自动回滚
+- URL 必须在 `CONFIG_APP_OTA_ALLOWED_URL_PREFIX` 白名单内
 
 ---
 
@@ -273,45 +237,43 @@ idf.py menuconfig
 
 ```text
 esp32_mcp/
-├── CMakeLists.txt
-├── partitions.csv              # 16 MB 双 OTA 分区
-├── sdkconfig.defaults
-├── components/mcp-c-sdk/       # 内置并打了两个小补丁（NVS token、默认参数）
-├── main/
-│   ├── app_main.c
-│   ├── wifi_manager.c
-│   ├── captive_portal.c
-│   ├── mcp_server.c
-│   ├── mcp_tools_*.c
-│   ├── gpio_guard.c
-│   ├── led_status.c
-│   ├── ota.c
-│   ├── mdns_service.c
-│   └── web/index.html
+├── components/
+│   ├── app_board/            # 4.3B / YD 板级、CH422G、RTC
+│   ├── app_ui/               # 场景服务、LVGL 后端、配网 UI、开机 Logo
+│   └── mcp-c-sdk/            # 内置 MCP SDK（含运行时 Token 等补丁）
+├── main/                     # Wi-Fi、HTTP、MCP 工具、OTA、时钟
+├── data/                     # 字体、品牌资源、SPIFFS 内容
 ├── tools/
-│   ├── serve_firmware.sh
-│   └── test_mcp.py
-└── docs/DESIGN.md
+│   ├── build_43b.sh
+│   ├── flash_43b.sh
+│   ├── gen_fonts.sh
+│   └── gen_boot_logo.py
+├── docs/
+│   ├── DISPLAY.md            # 4.3B 设计、场景、工具、P0 清单
+│   ├── DESIGN.md             # 基础 MCP 节点设计
+│   └── README-BRANCHES.md    # 分支 README 约定
+└── sdkconfig.defaults*
 ```
-
----
-
-## 内置 SDK 补丁
-
-`components/mcp-c-sdk` 是从 `espressif/mcp-c-sdk` v2.0.1 内置的副本，包含两个小补丁：
-
-1. **运行时 Token**：增加弱符号 `esp_mcp_http_get_bearer_token()`，应用侧从 NVS 返回每台设备独立令牌。
-2. **默认参数**：`tools/call` 缺少带默认值的参数时，自动使用 schema 默认值（例如 `hold_ms=0`、`brightness=20`）。
-
-另外，内置 HTTP transport 的 `httpd` 在 `esp_mcp_mgr_start()` 中才创建，因此注册顺序是
-`init → start → register_endpoint`。
 
 ---
 
 ## 已知限制
 
-- 第一版不支持 Secure Boot / Flash Encryption。
-- OTA 页面和 MCP OTA 都依赖局域网，不支持公网升级。
-- 配网热点默认密码 `esp32mcp`，生产环境建议改成每台随机密码。
-- `gpio_write` 是物理动作，Agent 接入时建议先用只读工具白名单。
-- Windows 默认可能不解析 `.local`，可改用 IP。
+- 4.3B 的 GPIO0 / GPIO48 被 LCD 占用，不能当普通 IO 或 WS2812 使用。
+- OTA 仅限局域网，不做 Secure Boot / Flash Encryption。
+- 字体覆盖 GB2312 全部 6763 汉字；生僻字、emoji 可能仍缺字。
+- 内置 MCP SDK 为 vendored 副本，升级时需重新核对补丁。
+
+---
+
+## 分支 README
+
+各分支的 README 内容不同，GitHub 会显示当前所选分支的版本：
+
+| 分支 | README 主题 |
+| --- | --- |
+| `main` | YD-ESP32-S3 基础 MCP 节点 |
+| `mcp-base` | MCP 基础固件 |
+| `esp32-mcp-lcd43b` | 4.3" 桌面显示平台（本文） |
+
+维护方式见 [`docs/README-BRANCHES.md`](docs/README-BRANCHES.md)。
