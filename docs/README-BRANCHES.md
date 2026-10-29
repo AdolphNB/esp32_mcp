@@ -24,31 +24,17 @@ git push origin <branch>
 
 只影响当前分支；其他分支的 README 不受影响。
 
-## 合并分支时的 README
+## 分支策略
 
-如果从 `esp32-mcp-lcd43b` 合并到 `main`，README 很可能冲突。建议：
+这些分支独立维护，`esp32-mcp-lcd43b` **不会合并回 `main`**，因此各分支的 README 可以长期保持不同，不需要考虑 README 合并冲突，也不需要配置 `merge=ours`。
+
+如果以后需要把某个功能同步到其他分支，建议只 cherry-pick 代码和共享文档，跳过 `README.md`：
 
 ```bash
-git merge esp32-mcp-lcd43b
-# 冲突时保留目标分支的 README
-git checkout --ours README.md
-git add README.md
+git cherry-pick -n <commit>
+git restore --staged --worktree README.md
 git commit
 ```
-
-如果希望以后自动保留目标分支的 README，可在本机启用自定义合并驱动（每个 clone 需要执行一次）：
-
-```bash
-git config merge.ours.driver true
-```
-
-并在仓库 `.gitattributes` 中加入：
-
-```gitattributes
-README.md merge=ours
-```
-
-> 注意：`merge=ours` 会让 README 在合并时**始终保留当前分支版本**，共享内容的更新需要手动同步。
 
 ## 共享内容放哪里
 
